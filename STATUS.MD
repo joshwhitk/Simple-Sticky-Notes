@@ -83,6 +83,7 @@
 - Flattened the storage layout so note markdown files now live directly under `Simple Sticky Notes`, while note metadata migrates into a hidden `.simple-sticky-notes\meta` sidecar folder.
 - Added startup migration for the old `notes\` and visible `meta\` folders so existing installs move forward automatically without losing notes or note state.
 - Added README comparison notes explaining why Microsoft Sticky Notes is adjacent but not a substitute for this project's local markdown and Obsidian-compatible storage model.
+- Removed the hand-installed app footprint before installer testing by stopping the live `main.py` tray processes, deleting the Python-created desktop and startup shortcuts, and clearing `%APPDATA%\SimpleStickyNotes` while leaving note content files untouched.
 
 ### Pri2
 
