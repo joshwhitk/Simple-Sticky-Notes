@@ -122,6 +122,23 @@ This keeps the markdown notes directly visible in Obsidian while the desktop app
 
 Obsidian pop-out windows are tied to Obsidian itself. That fails a key requirement for this project: sticky notes must remain restorable and desktop-native even when Obsidian is not running.
 
+## Compared With Microsoft Sticky Notes
+
+Microsoft Sticky Notes does cover some adjacent use cases well. According to Microsoft Support, it:
+
+- reopens notes where you left them
+- can sync notes across Windows, web, OneNote mobile apps, and Outlook when you sign in with a Microsoft account
+- supports search across notes
+- supports export through Outlook.com for synced notes
+
+That still does not match this project's core goals.
+
+- Microsoft stores synced notes in Microsoft's cloud and Outlook.com rather than as markdown files in an Obsidian-readable folder.
+- This project keeps the desktop app as the runtime owner while storing note bodies as normal `.md` files plus sidecar metadata under the user's chosen storage root.
+- This project is specifically optimizing for Obsidian-compatible local file storage, Windows shortcut workflows, startup restore, and direct file interoperability instead of Microsoft-account-centric sync.
+
+So the short answer is: no, Microsoft Sticky Notes does not already provide all of the features this project is targeting, especially around local markdown storage and Obsidian-compatible file ownership.
+
 ## Roadmap Summary
 
 - Finish the standalone note runtime

@@ -24,6 +24,7 @@
 
 ### Pri1
 
+- Push the current local commits to GitHub and publish the Windows installer artifact in the repo release flow.
 - Enforce a single tray-backed app instance so launching `Simple Sticky Notes` or `--new-note` reuses the running process instead of creating duplicate tray icons.
 - Move a selected note to the right of the current note when chosen from the right-click note list, clamped on-screen.
 - Add `Tidy Onto Main Screen` to the right-click menu so all open notes are moved and resized back onto the primary display.
@@ -81,6 +82,7 @@
 - Restored the existing git history into the Dropbox workspace by copying the original checkout's `.git` directory, verified `git status` works from the moved repo path, and prepared the workspace for normal commits again.
 - Flattened the storage layout so note markdown files now live directly under `Simple Sticky Notes`, while note metadata migrates into a hidden `.simple-sticky-notes\meta` sidecar folder.
 - Added startup migration for the old `notes\` and visible `meta\` folders so existing installs move forward automatically without losing notes or note state.
+- Added README comparison notes explaining why Microsoft Sticky Notes is adjacent but not a substitute for this project's local markdown and Obsidian-compatible storage model.
 
 ### Pri2
 

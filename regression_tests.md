@@ -12,6 +12,7 @@
 ## Results
 
 - On `2026-04-22`, `python -m unittest -v` passed `24` tests from the moved workspace root.
+- On `2026-04-22`, the README comparison against Microsoft Sticky Notes was refreshed from current Microsoft Support documentation. No code changes or automated tests were needed for that docs-only update.
 - Coverage now includes:
   - editor display-buffer handling so append-style blank-line focus does not leak unwanted trailing newlines into saved note files
   - content-based markdown filenames and uniqueness suffixes
