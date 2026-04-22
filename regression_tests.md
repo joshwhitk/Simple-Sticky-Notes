@@ -119,6 +119,9 @@
   - resulting artifacts are created at:
     - `dist\Simple Sticky Notes\`
     - `dist\installer\Simple-Sticky-Notes-Setup.exe`
+  - GitHub publish preparation is verified:
+    - `main` is pushed to `origin`
+    - GitHub CLI authentication is working for the `joshwhitk` account
 
 - Verified move-readiness:
   - audited the repo for hardcoded workspace-path references outside generated caches and build artifacts and found none in active source or docs

@@ -24,7 +24,6 @@
 
 ### Pri1
 
-- Push the current local commits to GitHub and publish the Windows installer artifact in the repo release flow.
 - Enforce a single tray-backed app instance so launching `Simple Sticky Notes` or `--new-note` reuses the running process instead of creating duplicate tray icons.
 - Move a selected note to the right of the current note when chosen from the right-click note list, clamped on-screen.
 - Add `Tidy Onto Main Screen` to the right-click menu so all open notes are moved and resized back onto the primary display.
@@ -84,6 +83,7 @@
 - Added startup migration for the old `notes\` and visible `meta\` folders so existing installs move forward automatically without losing notes or note state.
 - Added README comparison notes explaining why Microsoft Sticky Notes is adjacent but not a substitute for this project's local markdown and Obsidian-compatible storage model.
 - Removed the hand-installed app footprint before installer testing by stopping the live `main.py` tray processes, deleting the Python-created desktop and startup shortcuts, and clearing `%APPDATA%\SimpleStickyNotes` while leaving note content files untouched.
+- Pushed the current local commits to GitHub and prepared the first GitHub release flow with the current Windows installer artifact.
 
 ### Pri2
 
