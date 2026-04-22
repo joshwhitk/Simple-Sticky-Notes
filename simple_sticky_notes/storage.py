@@ -11,6 +11,7 @@ from .models import AppSettings, NoteMetadata, NoteRecord, utc_now_iso
 
 
 MAX_FILE_STEM_LENGTH = 80
+MAX_TITLE_WORDS = 10
 HIDDEN_APP_DIR_NAME = ".simple-sticky-notes"
 METADATA_DIR_NAME = "meta"
 LEGACY_NOTES_DIR_NAME = "notes"
@@ -66,7 +67,7 @@ class StickyStorage:
             created_at=now,
             updated_at=now,
             bg_color=bg_color,
-            file_stem=self.make_unique_file_stem(note_id, body, resolved_title),
+            file_stem=self.make_unique_file_stem(note_id, resolved_title),
         )
         note = NoteRecord(metadata=metadata, body=body)
         self.save_note(note)
@@ -82,15 +83,10 @@ class StickyStorage:
 
     def save_note(self, note: NoteRecord) -> None:
         note.metadata.updated_at = utc_now_iso()
-        desired_stem = self.make_unique_file_stem(note.metadata.note_id, note.body, note.metadata.title)
-        current_path = self._existing_note_path(note.metadata)
-        desired_path = self.notes_dir / f"{desired_stem}.md"
-
-        note.metadata.file_stem = desired_stem
-        if current_path.exists() and current_path != desired_path and not desired_path.exists():
-            current_path.rename(desired_path)
-
-        desired_path.write_text(note.body, encoding="utf-8")
+        if not note.metadata.file_stem:
+            note.metadata.file_stem = self.make_unique_file_stem(note.metadata.note_id, note.metadata.title)
+        note_path = self._existing_note_path(note.metadata)
+        note_path.write_text(note.body, encoding="utf-8")
         self.save_metadata(note.metadata)
 
     def save_metadata(self, metadata: NoteMetadata) -> None:
@@ -160,8 +156,8 @@ class StickyStorage:
             removed.append(note_id)
         return removed
 
-    def make_unique_file_stem(self, note_id: str, body: str, fallback_title: str) -> str:
-        base_stem = suggested_file_stem(body, fallback_title)
+    def make_unique_file_stem(self, note_id: str, title: str) -> str:
+        base_stem = suggested_file_stem(title)
         used_stems = {
             self._load_metadata(other_note_id).file_stem.casefold() or self._load_metadata(other_note_id).note_id.casefold()
             for other_note_id in self.list_note_ids()
@@ -221,9 +217,16 @@ class StickyStorage:
                     metadata_path.replace(destination)
             remove_empty_dirs(legacy_meta_dir)
 
+def note_title(body: str) -> str:
+    collapsed = collapsed_note_text(body)
+    words = collapsed.split()
+    if not words:
+        return "Untitled note"
+    return " ".join(words[:MAX_TITLE_WORDS])
 
-def suggested_file_stem(body: str, fallback_title: str) -> str:
-    source = collapsed_filename_source(body or fallback_title)
+
+def suggested_file_stem(title: str) -> str:
+    source = note_title(title)
     cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', " ", source)
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" .")
     if not cleaned:
@@ -231,7 +234,7 @@ def suggested_file_stem(body: str, fallback_title: str) -> str:
     return cleaned[:MAX_FILE_STEM_LENGTH].rstrip(" .")
 
 
-def collapsed_filename_source(text: str) -> str:
+def collapsed_note_text(text: str) -> str:
     flattened = " ".join(line.strip().lstrip("#").strip() for line in text.splitlines() if line.strip())
     return flattened or "Untitled note"
 

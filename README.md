@@ -23,7 +23,7 @@ This repo is in active prototyping. The current implementation includes:
 - Python/Tkinter app scaffold
 - Markdown file storage inside the active Obsidian vault when available
 - Sidecar metadata for note geometry and open/closed state
-- Content-based markdown filenames with uniqueness suffixes when needed
+- Stable markdown filenames based on each note title at creation time, with uniqueness suffixes when needed
 - Frameless note window shell with custom close button
 - System tray icon with background-app exit controls
 - Windows desktop/startup shortcut installer
@@ -39,6 +39,10 @@ This repo is in active prototyping. The current implementation includes:
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development](docs/DEVELOPMENT.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Store Submission](docs/STORE_SUBMISSION.md)
+- [Store Listing Draft](docs/STORE_LISTING_DRAFT.md)
+- [Store Assets Checklist](docs/STORE_ASSETS_CHECKLIST.md)
+- [Privacy Policy Draft](docs/PRIVACY_POLICY_DRAFT.md)
 - [Contributing](CONTRIBUTING.md)
 
 ## Quick Start
@@ -91,10 +95,10 @@ If no Obsidian vault is available yet, the app falls back to `%USERPROFILE%\Docu
 
 The storage layout is:
 
-- `<content-based note name>.md` for note bodies
+- `<note title>.md` for note bodies, based on the first 10 words when the note is created
 - `.simple-sticky-notes/meta/<note-id>.json` for window state and session metadata
 
-This keeps the markdown notes directly visible in Obsidian while the desktop app manages position, size, and runtime state in a hidden sidecar folder. If two notes would produce the same body filename, the app adds `-1`, `-2`, and so on.
+This keeps the markdown notes directly visible in Obsidian while the desktop app manages position, size, and runtime state in a hidden sidecar folder. If two notes would produce the same filename, the app adds `-1`, `-2`, and so on. The filename stays stable after creation so editing in Obsidian does not rename the file while you type.
 
 ## Repo Layout
 
@@ -123,6 +127,8 @@ This keeps the markdown notes directly visible in Obsidian while the desktop app
 Obsidian pop-out windows are tied to Obsidian itself. That fails a key requirement for this project: sticky notes must remain restorable and desktop-native even when Obsidian is not running.
 
 ## Compared With Microsoft Sticky Notes
+
+If you want to support development, you can also buy `Simple Sticky Notes` on the Microsoft Store once the listing is live.
 
 Microsoft Sticky Notes does cover some adjacent use cases well. According to Microsoft Support, it:
 

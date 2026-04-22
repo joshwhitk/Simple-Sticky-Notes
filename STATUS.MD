@@ -24,12 +24,14 @@
 
 ### Pri1
 
+- Change the Microsoft Store listing from free to a paid price around USD `$10`, using the Store pricing workflow that keeps the current review/publish status clear.
 - Enforce a single tray-backed app instance so launching `Simple Sticky Notes` or `--new-note` reuses the running process instead of creating duplicate tray icons.
 - Move a selected note to the right of the current note when chosen from the right-click note list, clamped on-screen.
 - Add `Tidy Onto Main Screen` to the right-click menu so all open notes are moved and resized back onto the primary display.
 - Apply a native Windows drop shadow to frameless note windows if the OS window manager will honor it.
 - Validate the packaged installer end-to-end on this PC, including the detected-vault storage prompt and installed shortcut behavior.
-- Disable Smart App Control on this developer machine so installer validation is not blocked by reputation-based consumer prompts.
+- Verify the updated stable-filename Obsidian flow manually on this PC so editing in Obsidian no longer steals focus into another note.
+- Publish the next patched installer build with the stable Obsidian filename flow and corrected packaged shortcut icon path.
 - Keep the repo and docs aligned with the app as implementation and validation land.
 
 ## Planned
@@ -87,6 +89,18 @@
 - Pushed the current local commits to GitHub and prepared the first GitHub release flow with the current Windows installer artifact.
 - Diagnosed the installer launch failure as a packaged-shortcut bug: the post-install Windows integration step was generating shortcuts that passed `_internal\main.py` to the frozen EXE instead of launching the installed EXE directly.
 - Fixed packaged shortcut generation so installer-created desktop and startup shortcuts now target the installed EXE with only supported CLI flags, while source checkouts still use `pythonw.exe main.py`.
+- Disabled Smart App Control on this developer machine so local installer validation is no longer blocked by reputation-based prompts.
+- Published the corrected installer to GitHub as `v1.0.1` and confirmed the public release asset path is ready for a Microsoft Store `EXE` submission.
+- Prepared Microsoft Store submission content for the current release: Partner Center field values, listing copy, screenshot/box-art checklist, and a privacy-policy draft.
+- Diagnosed the Obsidian focus-jump bug as filename churn during external sync: saving after an Obsidian edit recalculated the markdown filename from the live note body, so the file path could change underneath Obsidian while typing.
+- Changed note titles to the first 10 words of the note and kept markdown filenames stable after creation so Obsidian editing no longer triggers live file renames.
+- Added regression coverage for the first-10-words title rule and for external Obsidian edits reloading the sticky body without renaming the markdown file.
+- Created the Microsoft Partner Center product and submitted the first Store listing for review under Partner Center ID `78b96f9d-3b84-447d-93c2-50fe1a3e52a6`.
+- Confirmed the Store submission was accepted with a directly hosted installer URL and is now in the review queue with an estimated review time of about three days.
+- Captured the current Microsoft guidance for switching the Store listing to paid pricing: pricing is changed from the `Pricing and availability` page through a submission update, and package uploads are not required when only metadata such as price changes.
+- Diagnosed the desktop shortcut `failed to import encoding module` error as a stale installed shortcut definition still passing `_internal\\main.py` to the packaged EXE; repaired the existing desktop and startup `.lnk` files in place so they now launch the installed EXE directly with supported arguments only.
+- Diagnosed the wrong desktop shortcut icon as a packaged-path bug: installed shortcuts were pointing at a non-existent `_internal\\assets\\icons\\simple-sticky-notes.ico` file. Fix applied in source: packaged shortcuts now use the installed EXE itself as the icon source.
+- Built the `1.0.2` packaged app and installer from clean staging output after the stock `installer\\build.ps1` path was blocked by a live lock on the Dropbox `dist\\` directory; the staged packaged EXE passed a 2-second liveness smoke check.
 
 ### Pri2
 
@@ -131,3 +145,6 @@
 - Continue with the current clean implementation rather than adapting an external baseline further.
 - Existing Windows desktop and startup shortcuts must be rebuilt after a repo-folder move because `.lnk` targets embed the old project path.
 - Obsidian-facing storage should keep note markdown files directly in the `Simple Sticky Notes` root and move sidecar metadata into a hidden app-managed folder.
+- The first Microsoft Store submission should use the current `EXE/MSI` flow because the app already has a working offline installer, a public versioned download URL, and silent-install support; revisit `MSIX` later only if Store-managed packaging becomes worth the migration cost.
+- GitHub release asset URLs are not valid Partner Center package URLs for the `EXE/MSI` flow because they redirect; the Store submission needs a direct HTTPS installer URL plus CA-trusted code signing.
+- For Microsoft Store `EXE/MSI` submissions, use a direct hosted installer URL you control rather than a GitHub release asset URL.

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from simple_sticky_notes.models import AppSettings
 from simple_sticky_notes.app import editor_body_for_display, note_menu_label, persisted_body_from_editor, selection_bg_for
-from simple_sticky_notes.storage import StickyStorage, suggested_file_stem
+from simple_sticky_notes.storage import StickyStorage, note_title, suggested_file_stem
 
 
 class StickyStorageTests(unittest.TestCase):
@@ -43,7 +43,7 @@ class StickyStorageTests(unittest.TestCase):
         self.assertEqual(reloaded.metadata.width, 420)
         self.assertEqual(reloaded.metadata.height, 280)
         self.assertEqual(reloaded.metadata.bg_color, "#bbdefb")
-        self.assertEqual(reloaded.metadata.file_stem, "Body text")
+        self.assertEqual(reloaded.metadata.file_stem, "Colored note")
 
     def test_hide_note_keeps_note_but_marks_it_closed(self) -> None:
         note = self.storage.create_note("Closable")
@@ -81,21 +81,22 @@ class StickyStorageTests(unittest.TestCase):
     def test_selection_bg_for_darken_color(self) -> None:
         self.assertEqual(selection_bg_for("#ffd54f"), "#e0bb45")
 
-    def test_content_based_filenames_use_incrementing_suffixes(self) -> None:
-        first = self.storage.create_note(body="Same title")
-        second = self.storage.create_note(body="Same title")
+    def test_title_based_filenames_use_incrementing_suffixes(self) -> None:
+        first = self.storage.create_note(title="Same title", body="Body one")
+        second = self.storage.create_note(title="Same title", body="Body two")
         self.assertEqual(first.metadata.file_stem, "Same title")
         self.assertEqual(second.metadata.file_stem, "Same title-1")
 
-    def test_saving_note_renames_markdown_file_from_updated_content(self) -> None:
-        note = self.storage.create_note(body="Old title")
+    def test_saving_note_keeps_existing_markdown_filename_stable(self) -> None:
+        note = self.storage.create_note(title="Old title", body="Old title")
         old_path = Path(self.tempdir.name) / "Old title.md"
         self.assertTrue(old_path.exists())
         note.body = "New title"
         note.metadata.title = "New title"
         self.storage.save_note(note)
-        self.assertFalse(old_path.exists())
-        self.assertTrue((Path(self.tempdir.name) / "New title.md").exists())
+        self.assertTrue(old_path.exists())
+        self.assertFalse((Path(self.tempdir.name) / "New title.md").exists())
+        self.assertEqual(old_path.read_text(encoding="utf-8"), "New title")
 
     def test_storage_migrates_legacy_notes_and_metadata_layout(self) -> None:
         root = Path(self.tempdir.name)
@@ -118,7 +119,13 @@ class StickyStorageTests(unittest.TestCase):
         self.assertEqual(migrated.load_note("abc123").body, "hello")
 
     def test_suggested_file_stem_sanitizes_invalid_filename_characters(self) -> None:
-        self.assertEqual(suggested_file_stem("Plan: finish / ship? *today*", "fallback"), "Plan finish ship today")
+        self.assertEqual(suggested_file_stem("Plan: finish / ship? *today*"), "Plan finish ship today")
+
+    def test_note_title_uses_first_ten_words(self) -> None:
+        self.assertEqual(
+            note_title("one two three four five six seven eight nine ten eleven twelve"),
+            "one two three four five six seven eight nine ten",
+        )
 
 
 if __name__ == "__main__":

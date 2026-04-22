@@ -11,7 +11,7 @@ from typing import Callable
 from .models import NoteRecord
 from .runtime_state import mark_app_launch, mark_clean_shutdown
 from .settings import copy_storage_contents, load_settings, save_settings
-from .storage import StickyStorage
+from .storage import StickyStorage, note_title
 from .tray import TrayController
 from .windows_integration import edit_in_notepad, edit_in_obsidian, show_folder
 
@@ -175,7 +175,7 @@ class NoteWindow:
             self._autosave_job = None
         body = persisted_body_from_editor(self.text.get("1.0", "end-1c"))
         self.note.body = body
-        self.note.metadata.title = first_line_title(body)
+        self.note.metadata.title = note_title(body)
         x, y, width, height = self._geometry()
         self.note.metadata.x = x
         self.note.metadata.y = y
@@ -501,7 +501,7 @@ class NoteWindow:
             return
 
         self.note.body = disk_body
-        self.note.metadata.title = first_line_title(disk_body)
+        self.note.metadata.title = note_title(disk_body)
         self.storage.save_note(self.note)
         self._last_disk_signature = self._current_disk_signature()
         self.text.delete("1.0", "end")
@@ -582,7 +582,7 @@ class StickyNotesApp:
         y: int = 80,
         bg_color: str = DEFAULT_NOTE_BG,
     ) -> None:
-        title = first_line_title(body)
+        title = note_title(body)
         note = self.storage.create_note(
             title=title,
             body=body,
@@ -695,16 +695,6 @@ class StickyNotesApp:
         self.windows.clear()
         self.root.quit()
         self.root.destroy()
-
-
-def first_line_title(body: str) -> str:
-    for line in body.splitlines():
-        stripped = line.strip().lstrip("#").strip()
-        if stripped:
-            return stripped[:60]
-    return "Untitled note"
-
-
 def editor_body_for_display(body: str) -> str:
     return body + "\n"
 

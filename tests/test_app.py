@@ -97,6 +97,20 @@ class AppBehaviorTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(self.app.storage.list_notes(), [])
 
+    def test_external_obsidian_edit_reloads_body_without_renaming_markdown_file(self) -> None:
+        self.app.create_and_open_note(body="one two three four five six seven eight nine ten eleven")
+        window = next(iter(self.app.windows.values()))
+        note_id = window.note.metadata.note_id
+        note_path = self.app.storage.note_path(note_id)
+
+        note_path.write_text("updated from obsidian with more words than before", encoding="utf-8")
+
+        window._refresh_from_disk_if_needed()
+
+        self.assertEqual(self.app.storage.note_path(note_id), note_path)
+        self.assertEqual(window.note.metadata.title, "updated from obsidian with more words than before")
+        self.assertEqual(note_path.read_text(encoding="utf-8"), "updated from obsidian with more words than before")
+
 
 if __name__ == "__main__":
     unittest.main()

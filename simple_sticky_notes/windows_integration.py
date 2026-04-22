@@ -15,6 +15,12 @@ class ShortcutLaunchSpec(NamedTuple):
     working_directory: Path
 
 
+def shortcut_icon_path() -> Path:
+    if running_frozen():
+        return Path(sys.executable).resolve()
+    return resource_root() / "assets" / "icons" / "simple-sticky-notes.ico"
+
+
 def resource_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
@@ -86,7 +92,7 @@ $shortcut.Save()
 
 
 def install_windows_shortcuts() -> dict[str, str]:
-    icon = resource_root() / "assets" / "icons" / "simple-sticky-notes.ico"
+    icon = shortcut_icon_path()
     desktop = Path.home() / "Desktop"
     startup = Path.home() / "AppData" / "Roaming" / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
 
