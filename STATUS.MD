@@ -29,6 +29,7 @@
 - Define the storage model for `.md` note content and note window metadata.
 - Harden the first working app slice: frameless note window behavior, autosave, and session persistence.
 - Improve note lifecycle semantics so hidden notes stay hidden while open notes restore cleanly after login.
+- Align sticky-note storage with the active Obsidian vault so notes appear inside Obsidian and `Edit in Obsidian` resolves against the real vault.
 - Keep the repo presentable in the usual GitHub way as implementation work lands.
 
 ## Planned
@@ -36,6 +37,8 @@
 ### Pri2
 
 * Improve note state handling after abnormal shutdowns or forced termination.
+* Fix drag behavior so moving a sticky note window does not select the note text.
+* Fix inconsistent right-click context-menu behavior where some notes do not show the menu even though other open notes do.
 
 ### Pri3
 
@@ -57,6 +60,7 @@
 * Removed the local `lokus` checkout from this workspace.
 * Created and configured a test Obsidian vault with the `sticky-notes` plugin.
 * Determined that the Obsidian plugin route is not the right product basis because notes must survive independently of Obsidian at runtime.
+* Removed the `sticky-notes` Obsidian plugin from the test vault and cleaned up its local source checkout because the project is no longer using that route.
 * Searched GitHub for Windows sticky-note apps and sticky-note integrations with Obsidian/Joplin/Evernote/plaintext storage.
 * Determined there is no strong off-the-shelf GitHub project that already satisfies both the required desktop-window behavior and file-backed note interoperability.
 * Identified `Textylic` as the strongest source-available UI/runtime baseline found so far.
@@ -89,6 +93,7 @@
 * Added a right-click `Set Storage Folder` action that saves a new storage location for use after restart.
 * Changed note body files from opaque ID-based names to long content-based filenames with `-1` style uniqueness suffixes when needed.
 * Implemented basic 2-way Obsidian sync by detecting external edits to shared markdown files and reloading them into open sticky windows.
+* Aligned the sticky-note storage root with the active Obsidian vault and migrated existing notes there so they are visible inside the current vault.
 
 ## Deferred
 

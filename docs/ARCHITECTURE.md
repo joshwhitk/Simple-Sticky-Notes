@@ -5,7 +5,7 @@
 Simple Sticky Notes is a standalone Windows desktop app.
 
 - The app owns sticky-note windows and session restore.
-- Note content is stored as markdown files in a standard user-accessible Windows folder.
+- Note content is stored as markdown files inside the active Obsidian vault when one is available, with a Documents fallback.
 - Metadata is stored separately in JSON sidecars.
 - Obsidian is a companion reader/editor for the same note files, not the runtime.
 - Open sticky windows poll their backing markdown files so external edits can flow back into the desktop UI.
@@ -44,7 +44,14 @@ Storage layer:
 
 ### `simple_sticky_notes/settings.py`
 
-Settings persistence under `%APPDATA%\SimpleStickyNotes`.
+Settings persistence under `%APPDATA%\SimpleStickyNotes`, including storage-root migration into the active Obsidian vault.
+
+### `simple_sticky_notes/obsidian_integration.py`
+
+Obsidian integration helpers:
+
+- detect the active vault from Obsidian config
+- choose the preferred storage root inside that vault
 
 ### `simple_sticky_notes/windows_integration.py`
 

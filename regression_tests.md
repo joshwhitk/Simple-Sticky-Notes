@@ -23,6 +23,7 @@
   - Added regression coverage for the editor buffer helpers so the UI can keep a blank append line without persisting an unwanted extra newline into saved note files.
   - Added coverage for richer note creation metadata, note-menu state labels, and sticky-themed selection-color derivation.
   - Added coverage for content-based markdown filenames, `-1` collision suffixes, and legacy-storage migration into the new default Documents location.
+  - Added coverage for detecting the active Obsidian vault and migrating the default Documents storage into the vault-backed location.
   - Verified the append-focus diagnostic lands the caret on the blank line and the text body reserves space for the close button:
     ```powershell
     @'
@@ -110,6 +111,7 @@
     Expected results:
     - `reloaded_body=Updated from Obsidian`
     - `renamed_file=Updated from Obsidian.md`
+  - Verified live settings migration moved the active storage root into the current Obsidian vault and copied notes there.
   - Verified a timed GUI smoke launch completes without Tk errors:
     ```powershell
     @'

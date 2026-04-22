@@ -1,6 +1,6 @@
 # Simple Sticky Notes
 
-Simple Sticky Notes is a Windows desktop sticky-note companion app that stores note bodies as markdown files in a normal Windows folder, with markdown files that Obsidian can read directly.
+Simple Sticky Notes is a Windows desktop sticky-note companion app that stores note bodies as markdown files in the active Obsidian vault when one is available, with markdown files that Obsidian can read directly.
 
 The app is intentionally **not** built on top of Obsidian as the runtime. Obsidian remains a useful companion for editing, searching, and browsing the same markdown files, but the sticky-note windows themselves are owned by a standalone Windows app so they can remain visible and restorable independent of Obsidian.
 
@@ -21,7 +21,7 @@ The app is intentionally **not** built on top of Obsidian as the runtime. Obsidi
 This repo is in active prototyping. The first implementation slice includes:
 
 - Python/Tkinter app scaffold
-- Markdown file storage in Documents by default
+- Markdown file storage inside the active Obsidian vault when available
 - Sidecar metadata for note geometry and open/closed state
 - Content-based markdown filenames with uniqueness suffixes when needed
 - Frameless note window shell with custom close button
@@ -69,7 +69,9 @@ python -m unittest discover -s tests -p "test_*.py" -v
 
 By default note data is stored under:
 
-`%USERPROFILE%\Documents\Simple Sticky Notes\`
+`<active Obsidian vault>\Simple Sticky Notes\`
+
+If no Obsidian vault is available yet, the app falls back to `%USERPROFILE%\Documents\Simple Sticky Notes\`.
 
 The storage layout is:
 

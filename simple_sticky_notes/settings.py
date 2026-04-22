@@ -6,11 +6,16 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .models import AppSettings
+from .obsidian_integration import recommended_storage_root
 
 
 APP_DATA_DIR = Path.home() / "AppData" / "Roaming" / "SimpleStickyNotes"
 SETTINGS_PATH = APP_DATA_DIR / "settings.json"
-DEFAULT_STORAGE_ROOT = Path.home() / "Documents" / "Simple Sticky Notes"
+DEFAULT_STORAGE_ROOT = recommended_storage_root()
+
+
+def documents_default_storage_root() -> Path:
+    return Path.home() / "Documents" / "Simple Sticky Notes"
 
 
 def ensure_app_data_dir() -> Path:
@@ -31,7 +36,8 @@ def load_settings() -> AppSettings:
 
     data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
     settings = AppSettings(**data)
-    return migrate_legacy_storage_root(settings)
+    settings = migrate_legacy_storage_root(settings)
+    return migrate_default_documents_storage_to_obsidian(settings)
 
 
 def save_settings(settings: AppSettings) -> None:
@@ -77,3 +83,16 @@ def looks_like_legacy_dropbox_storage(path: str | Path) -> bool:
     candidate = Path(path)
     parts = {part.casefold() for part in candidate.parts}
     return "dropbox" in parts and candidate.name.casefold() == "simple-sticky-notes"
+
+
+def migrate_default_documents_storage_to_obsidian(settings: AppSettings) -> AppSettings:
+    documents_default = documents_default_storage_root()
+    if normalized_path(settings.storage_root) != normalized_path(documents_default):
+        return settings
+    if normalized_path(DEFAULT_STORAGE_ROOT) == normalized_path(documents_default):
+        return settings
+
+    copy_storage_contents(Path(settings.storage_root), DEFAULT_STORAGE_ROOT)
+    settings.storage_root = str(DEFAULT_STORAGE_ROOT)
+    save_settings(settings)
+    return settings
