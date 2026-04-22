@@ -31,7 +31,6 @@
 - Apply a native Windows drop shadow to frameless note windows if the OS window manager will honor it.
 - Validate the packaged installer end-to-end on this PC, including the detected-vault storage prompt and installed shortcut behavior.
 - Verify the updated stable-filename Obsidian flow manually on this PC so editing in Obsidian no longer steals focus into another note.
-- Publish the next patched installer build with the stable Obsidian filename flow and corrected packaged shortcut icon path.
 - Keep the repo and docs aligned with the app as implementation and validation land.
 
 ## Planned
@@ -101,6 +100,7 @@
 - Diagnosed the desktop shortcut `failed to import encoding module` error as a stale installed shortcut definition still passing `_internal\\main.py` to the packaged EXE; repaired the existing desktop and startup `.lnk` files in place so they now launch the installed EXE directly with supported arguments only.
 - Diagnosed the wrong desktop shortcut icon as a packaged-path bug: installed shortcuts were pointing at a non-existent `_internal\\assets\\icons\\simple-sticky-notes.ico` file. Fix applied in source: packaged shortcuts now use the installed EXE itself as the icon source.
 - Built the `1.0.2` packaged app and installer from clean staging output after the stock `installer\\build.ps1` path was blocked by a live lock on the Dropbox `dist\\` directory; the staged packaged EXE passed a 2-second liveness smoke check.
+- Published `v1.0.2` to GitHub, including the patched installer asset, and mirrored the same installer to the direct download URL used for Store-friendly hosting.
 
 ### Pri2
 

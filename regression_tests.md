@@ -14,6 +14,7 @@
 - On `2026-04-23`, `python -m unittest -v` passed `30` tests after the Obsidian filename fix and packaged shortcut icon fix landed.
 - On `2026-04-23`, a staged `1.0.2` packaged EXE smoke check passed with `packaged_exe_alive_after_2s=True`.
 - On `2026-04-23`, `installer\build.ps1` was blocked by a lock on the Dropbox `dist\` directory, so the same PyInstaller and Inno Setup steps were rerun successfully against clean staging paths to produce the `1.0.2` installer artifact. This was an environment workaround, not a code fix.
+- On `2026-04-23`, `v1.0.2` was published to GitHub and mirrored to `https://app.whitkin.com/downloads/Simple-Sticky-Notes-Setup.exe`. No additional automated tests were run for that release-management step.
 - On `2026-04-23`, Microsoft Store pricing guidance for switching the listing to a paid tier was documented from current Microsoft docs. No automated tests were run for that release-management guidance.
 - On `2026-04-23`, the first Microsoft Store submission was created in Partner Center and entered review under ID `78b96f9d-3b84-447d-93c2-50fe1a3e52a6`. No automated tests were run for that release-management update.
 - On `2026-04-23`, the installed desktop and startup shortcuts on this PC were manually inspected after a `failed to import encoding module` launch error. The diagnosis confirmed stale packaged shortcut arguments pointing at `_internal\main.py`, and the live `.lnk` files were recreated to launch the installed EXE directly. No automated tests were run for that machine-specific shortcut repair.
@@ -25,7 +26,7 @@
 - On `2026-04-22`, the Store submission docs were corrected after live Partner Center validation showed GitHub release asset URLs are rejected for redirecting and the `EXE/MSI` path requires CA-trusted signing. No automated tests were run for that docs-only correction.
 - Coverage now includes:
   - editor display-buffer handling so append-style blank-line focus does not leak unwanted trailing newlines into saved note files
-  - content-based markdown filenames and uniqueness suffixes
+  - stable title-based markdown filenames with uniqueness suffixes
   - note titles derived from the first `10` words of the note
   - active-vault detection and default storage migration into an Obsidian vault
   - vault-relative Obsidian URI generation for `Edit in Obsidian`
@@ -88,22 +89,27 @@
     Expected result:
     - `packaged_exe_alive_after_2s=True`
 
-  - content-based filename diagnostic still produces a long markdown filename from note content:
+  - title-based filename diagnostic still produces a stable markdown filename from the note title chosen at creation time:
     ```powershell
     @'
     from simple_sticky_notes.app import StickyNotesApp
+    from simple_sticky_notes.storage import note_title
+
     app = StickyNotesApp()
-    app.create_and_open_note(body='This note filename should follow the body content')
+    body = 'This note filename should follow the body content even if it keeps going'
+    app.create_and_open_note(body=body)
     window = next(iter(app.windows.values()))
     window.flush_note()
+    print(f"note_title={note_title(body)}")
     print(f"note_file={app.storage.note_path(window.note.metadata.note_id).name}")
     app.shutdown()
     '@ | python -
     ```
     Expected result:
-    - `note_file=This note filename should follow the body content.md`
+    - `note_title=This note filename should follow the body content even if`
+    - `note_file=This note filename should follow the body content even if.md`
 
-  - 2-way sync diagnostic still reloads an external markdown edit and updates the note filename accordingly:
+  - 2-way sync diagnostic still reloads an external markdown edit without renaming the markdown file out from under Obsidian:
     ```powershell
     @'
     import time
@@ -114,18 +120,20 @@
     window = next(iter(app.windows.values()))
     window.flush_note()
     note_path_before = app.storage.note_path(window.note.metadata.note_id)
-    note_path_before.write_text('Updated from Obsidian', encoding='utf-8')
+    note_path_before.write_text('Updated from Obsidian with enough words to change the title', encoding='utf-8')
     time.sleep(0.02)
     window._refresh_from_disk_if_needed()
     app.root.update_idletasks()
     print(f"reloaded_body={persisted_body_from_editor(window.text.get('1.0', 'end-1c'))}")
-    print(f"renamed_file={app.storage.note_path(window.note.metadata.note_id).name}")
+    print(f"same_file={(app.storage.note_path(window.note.metadata.note_id) == note_path_before)}")
+    print(f"note_title={window.note.metadata.title}")
     app.shutdown()
     '@ | python -
     ```
     Expected results:
-    - `reloaded_body=Updated from Obsidian`
-    - `renamed_file=Updated from Obsidian.md`
+    - `reloaded_body=Updated from Obsidian with enough words to change the title`
+    - `same_file=True`
+    - `note_title=Updated from Obsidian with enough words to change the title`
 
 - Verified packaging:
   - `powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1` succeeds from the moved workspace
