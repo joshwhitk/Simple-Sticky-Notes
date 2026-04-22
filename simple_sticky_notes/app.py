@@ -11,6 +11,12 @@ from .storage import StickyStorage
 NOTE_BG = "#ffd54f"
 NOTE_TEXT = "#1f2933"
 CORNER_RADIUS = 4
+MIN_WIDTH = 180
+MIN_HEIGHT = 120
+DRAG_ZONE_HEIGHT = 28
+RESIZE_HOTSPOT_SIZE = 16
+CLOSE_BUTTON_SIZE = 24
+CLOSE_BUTTON_MARGIN = 6
 
 
 class NoteWindow:
@@ -34,34 +40,35 @@ class NoteWindow:
 
         self.container = tk.Frame(self.window, bg=NOTE_BG, highlightthickness=0, bd=0)
         self.container.pack(fill="both", expand=True)
-
-        self.title_bar = tk.Frame(self.container, bg=NOTE_BG, height=24, bd=0, highlightthickness=0)
-        self.title_bar.pack(fill="x")
-        self.title_bar.bind("<ButtonPress-1>", self._start_drag)
-        self.title_bar.bind("<B1-Motion>", self._drag)
-
-        self.drag_spacer = tk.Frame(self.title_bar, bg=NOTE_BG, height=24)
-        self.drag_spacer.pack(side="left", fill="x", expand=True)
-        self.drag_spacer.bind("<ButtonPress-1>", self._start_drag)
-        self.drag_spacer.bind("<B1-Motion>", self._drag)
+        self.container.bind("<ButtonPress-1>", self._on_pointer_down)
+        self.container.bind("<B1-Motion>", self._on_pointer_drag)
+        self.container.bind("<ButtonRelease-1>", self._clear_pointer_state)
+        self.window.bind("<ButtonRelease-1>", self._clear_pointer_state)
+        self.window.bind("<Motion>", self._update_cursor)
 
         self.close_button = tk.Button(
-            self.title_bar,
+            self.container,
             text="X",
             bg=NOTE_BG,
             fg=NOTE_TEXT,
             bd=0,
             activebackground=NOTE_BG,
             activeforeground=NOTE_TEXT,
-            padx=8,
-            pady=2,
+            highlightthickness=0,
+            relief="flat",
+            font=("Arial", 10, "bold"),
             command=self.hide_note,
         )
-        self.close_button.pack(side="right")
+        self.close_button.place(width=CLOSE_BUTTON_SIZE, height=CLOSE_BUTTON_SIZE)
 
         font_spec = (manager.settings.font_family, manager.settings.font_size)
+        self.body = tk.Frame(self.container, bg=NOTE_BG, bd=0, highlightthickness=0)
+        self.body.pack(fill="both", expand=True, padx=0, pady=(18, 0))
+        self.body.bind("<ButtonPress-1>", self._on_pointer_down)
+        self.body.bind("<B1-Motion>", self._on_pointer_drag)
+        self.body.bind("<ButtonRelease-1>", self._clear_pointer_state)
         self.text = tk.Text(
-            self.container,
+            self.body,
             wrap="word",
             bd=0,
             relief="flat",
@@ -76,13 +83,13 @@ class NoteWindow:
         self.text.pack(fill="both", expand=True)
         self.text.insert("1.0", note.body)
         self.text.bind("<<Modified>>", self._on_modified)
-
-        self.resize_zone = tk.Frame(self.container, bg=NOTE_BG, width=18, height=18, cursor="size_nw_se")
-        self.resize_zone.place(relx=1.0, rely=1.0, anchor="se")
-        self.resize_zone.bind("<ButtonPress-1>", self._start_resize)
-        self.resize_zone.bind("<B1-Motion>", self._resize)
+        self.text.bind("<ButtonPress-1>", self._on_text_pointer_down)
+        self.text.bind("<B1-Motion>", self._on_text_pointer_drag)
+        self.text.bind("<ButtonRelease-1>", self._clear_pointer_state)
+        self.text.bind("<Motion>", self._update_cursor)
 
         self._apply_rounded_corners()
+        self._position_controls()
 
     def show(self) -> None:
         self.window.deiconify()
@@ -116,7 +123,7 @@ class NoteWindow:
         self.flush_note()
 
     def _on_configure(self, _event: object) -> None:
-        self.resize_zone.place(relx=1.0, rely=1.0, anchor="se")
+        self._position_controls()
         self._apply_rounded_corners()
 
     def _geometry(self) -> tuple[int, int, int, int]:
@@ -148,16 +155,91 @@ class NoteWindow:
         if not self._resize_origin:
             return
         start_x, start_y, start_width, start_height = self._resize_origin
-        width = max(180, start_width + (event.x_root - start_x))
-        height = max(120, start_height + (event.y_root - start_y))
+        width = max(MIN_WIDTH, start_width + (event.x_root - start_x))
+        height = max(MIN_HEIGHT, start_height + (event.y_root - start_y))
         self.window.geometry(f"{width}x{height}+{self.window.winfo_x()}+{self.window.winfo_y()}")
 
     def _apply_rounded_corners(self) -> None:
         hwnd = self.window.winfo_id()
         width = max(self.window.winfo_width(), 1)
         height = max(self.window.winfo_height(), 1)
-        region = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, width + 1, height + 1, CORNER_RADIUS, CORNER_RADIUS)
+        diameter = CORNER_RADIUS * 2
+        region = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, width + 1, height + 1, diameter, diameter)
         ctypes.windll.user32.SetWindowRgn(hwnd, region, True)
+
+    def _position_controls(self) -> None:
+        self.close_button.place(
+            x=max(self.window.winfo_width() - CLOSE_BUTTON_SIZE - CLOSE_BUTTON_MARGIN, 0),
+            y=CLOSE_BUTTON_MARGIN,
+        )
+
+    def _update_cursor(self, event: tk.Event) -> None:
+        local_x, local_y = self._local_pointer(event)
+        cursor = self._cursor_for_widget(event.widget, local_x, local_y)
+        target = event.widget if isinstance(event.widget, tk.Misc) else self.window
+        target.configure(cursor=cursor)
+
+    def _on_pointer_down(self, event: tk.Event) -> str | None:
+        local_x, local_y = self._local_pointer(event)
+        if self._is_resize_hotspot(local_x, local_y):
+            self._start_resize(event)
+            return "break"
+        if self._is_drag_zone(local_x, local_y):
+            self._start_drag(event)
+        return None
+
+    def _on_pointer_drag(self, event: tk.Event) -> str | None:
+        if self._resize_origin:
+            self._resize(event)
+            return "break"
+        if self._drag_origin:
+            self._drag(event)
+            return "break"
+        return None
+
+    def _on_text_pointer_down(self, event: tk.Event) -> str | None:
+        local_x, local_y = self._local_pointer(event)
+        if self._is_resize_hotspot(local_x, local_y):
+            self._start_resize(event)
+            return "break"
+        if self._is_drag_zone(local_x, local_y):
+            self._start_drag(event)
+            return "break"
+        return None
+
+    def _on_text_pointer_drag(self, event: tk.Event) -> str | None:
+        if self._resize_origin:
+            self._resize(event)
+            return "break"
+        if self._drag_origin:
+            self._drag(event)
+            return "break"
+        return None
+
+    def _clear_pointer_state(self, _event: tk.Event | None = None) -> None:
+        self._drag_origin = None
+        self._resize_origin = None
+
+    def _is_drag_zone(self, x: int, y: int) -> bool:
+        return y <= DRAG_ZONE_HEIGHT and x < (self.window.winfo_width() - CLOSE_BUTTON_SIZE - (CLOSE_BUTTON_MARGIN * 2))
+
+    def _is_resize_hotspot(self, x: int, y: int) -> bool:
+        return (
+            x >= self.window.winfo_width() - RESIZE_HOTSPOT_SIZE
+            and y >= self.window.winfo_height() - RESIZE_HOTSPOT_SIZE
+        )
+
+    def _local_pointer(self, event: tk.Event) -> tuple[int, int]:
+        return (event.x_root - self.window.winfo_x(), event.y_root - self.window.winfo_y())
+
+    def _cursor_for_widget(self, widget: object, x: int, y: int) -> str:
+        if self._is_resize_hotspot(x, y):
+            return "size_nw_se"
+        if self._is_drag_zone(x, y):
+            return "arrow"
+        if widget == self.text:
+            return "xterm"
+        return "arrow"
 
 
 class StickyNotesApp:

@@ -65,8 +65,11 @@
 * Implemented the first standalone app slice in Python/Tkinter with markdown body storage, JSON sidecar metadata, frameless note windows, and a custom close button.
 * Removed the visible note title and visible resize-grip icon so the note looks more like a literal sticky note.
 * Added rounded window corners and an invisible resize zone in place of the default corner grab UI.
+* Flattened the remaining note chrome into the sticky body so the window no longer uses a visible top header strip.
+* Corrected the Win32 rounded-corner implementation to deliver an actual 4px visual corner radius instead of a smaller effective curve.
 * Implemented Windows shortcut installation for a desktop `New Simple Sticky Note` launcher and a startup shortcut for restoring notes after login.
 * Smoke-tested the app launch path and verified note files and metadata are created under `C:\Users\Josh\Dropbox\backups\josh-obsidian\simple-sticky-notes\`.
+* Verified the updated frameless note window launches cleanly after the chrome-removal changes.
 
 ### Pri2
 

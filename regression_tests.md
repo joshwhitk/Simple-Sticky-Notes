@@ -19,3 +19,14 @@
     - `C:\Users\Josh\Desktop\New Simple Sticky Note.lnk`
     - `C:\Users\Josh\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Simple Sticky Notes.lnk`
   - Verified launching `python main.py --new-note` creates `.md` and `.json` note files under `C:\Users\Josh\Dropbox\backups\josh-obsidian\simple-sticky-notes\`.
+  - Verified `python -m unittest -v` still passes after the frameless note UI changes.
+  - Verified a timed GUI smoke launch completes without Tk errors:
+    ```powershell
+    @'
+    from simple_sticky_notes.app import StickyNotesApp
+    app = StickyNotesApp()
+    app.root.after(900, app.shutdown)
+    result = app.run(create_new_note=True)
+    print(f"gui_smoke={result}")
+    '@ | python -
+    ```
