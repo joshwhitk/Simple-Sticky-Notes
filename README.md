@@ -91,10 +91,10 @@ If no Obsidian vault is available yet, the app falls back to `%USERPROFILE%\Docu
 
 The storage layout is:
 
-- `notes/<content-based note name>.md` for note bodies
-- `meta/<note-id>.json` for window state and session metadata
+- `<content-based note name>.md` for note bodies
+- `.simple-sticky-notes/meta/<note-id>.json` for window state and session metadata
 
-This allows Obsidian to read the note bodies directly while the desktop app manages position, size, and runtime state separately. If two notes would produce the same body filename, the app adds `-1`, `-2`, and so on.
+This keeps the markdown notes directly visible in Obsidian while the desktop app manages position, size, and runtime state in a hidden sidecar folder. If two notes would produce the same body filename, the app adds `-1`, `-2`, and so on.
 
 ## Repo Layout
 

@@ -32,7 +32,7 @@ class ObsidianIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             vault_path = Path(tempdir) / "joshs-stuff"
             vault_path.mkdir()
-            note_path = vault_path / "Simple Sticky Notes" / "notes" / "Example Note.md"
+            note_path = vault_path / "Simple Sticky Notes" / "Example Note.md"
             note_path.parent.mkdir(parents=True)
             note_path.write_text("hello", encoding="utf-8")
             config_path = Path(tempdir) / "obsidian.json"
@@ -44,15 +44,14 @@ class ObsidianIntegrationTests(unittest.TestCase):
             with mock.patch.object(obsidian_integration, "OBSIDIAN_CONFIG_PATH", config_path):
                 self.assertEqual(
                     obsidian_integration.obsidian_open_uri(note_path),
-                    "obsidian://open?vault=joshs-stuff&file=Simple%20Sticky%20Notes/notes/Example%20Note.md",
+                    "obsidian://open?vault=joshs-stuff&file=Simple%20Sticky%20Notes/Example%20Note.md",
                 )
 
     def test_migrate_default_documents_storage_to_obsidian(self) -> None:
         with tempfile.TemporaryDirectory() as documents_dir, tempfile.TemporaryDirectory() as vault_dir:
             documents_root = Path(documents_dir)
             vault_root = Path(vault_dir)
-            (documents_root / "notes").mkdir(parents=True)
-            (documents_root / "notes" / "Seen in Obsidian.md").write_text("hello", encoding="utf-8")
+            (documents_root / "Seen in Obsidian.md").write_text("hello", encoding="utf-8")
             app_settings = AppSettings(storage_root=str(documents_root))
 
             with mock.patch.object(settings_module, "DEFAULT_STORAGE_ROOT", vault_root), mock.patch.object(
@@ -63,7 +62,7 @@ class ObsidianIntegrationTests(unittest.TestCase):
                 migrated = settings_module.migrate_default_documents_storage_to_obsidian(app_settings)
 
             self.assertEqual(migrated.storage_root, str(vault_root))
-            self.assertTrue((vault_root / "notes" / "Seen in Obsidian.md").exists())
+            self.assertTrue((vault_root / "Seen in Obsidian.md").exists())
             save_mock.assert_called_once()
 
 

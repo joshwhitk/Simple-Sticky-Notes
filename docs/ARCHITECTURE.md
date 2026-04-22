@@ -61,10 +61,10 @@ Windows-specific shortcut generation using PowerShell and WScript COM.
 
 ```text
 simple-sticky-notes/
-|-- notes/
-|   `-- <content-based note name>.md
-`-- meta/
-    `-- <note-id>.json
+|-- <content-based note name>.md
+`-- .simple-sticky-notes/
+    `-- meta/
+        `-- <note-id>.json
 ```
 
 ## Metadata Fields

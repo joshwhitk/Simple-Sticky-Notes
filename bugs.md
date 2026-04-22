@@ -15,6 +15,9 @@
 - Lifecycle bug: there was no clear app-level exit path once notes were hidden and the process was still running. Fix applied: add a system tray icon with `New Sticky`, note reopening, and `Exit`.
 - Notes refresh bug: deleting a source `.md` file did not disappear from the sticky-note list because metadata survived. Fix applied: prune orphaned metadata during menu refresh and close any open sticky whose backing markdown file is deleted.
 - Windows integration path bug after moving the workspace: the existing desktop and startup `.lnk` files still targeted the previous folder because Windows shortcuts embed absolute target paths. Verified repair: rerun `python main.py --install-windows-integration` from the moved workspace to rewrite both shortcuts.
+- Window placement bug: choosing another note from the right-click note list only focused it at its previous coordinates, which made note switching awkward and left some notes effectively lost off-screen after monitor/layout changes. Planned fix: anchor note switching to the current note, clamp it to the active work area, and add a `Tidy Onto Main Screen` recovery action for all open notes.
+- Tray duplication bug: launching the app again while it is already running creates a second process and a second tray icon because each launch path starts a fresh `StickyNotesApp` and `pystray.Icon`. Planned fix: enforce a single running instance and forward `--new-note` commands to that existing process.
+- Obsidian layout bug: storing notes under `Simple Sticky Notes\notes\` and metadata under a visible `meta\` folder made the vault view unnecessarily cluttered. Fix applied: note markdown files now live directly under `Simple Sticky Notes`, and metadata migrates into a hidden `.simple-sticky-notes\meta` folder.
 
 ## Open Bugs
 

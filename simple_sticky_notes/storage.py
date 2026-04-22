@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import json
 import re
 from dataclasses import asdict
@@ -10,17 +11,26 @@ from .models import AppSettings, NoteMetadata, NoteRecord, utc_now_iso
 
 
 MAX_FILE_STEM_LENGTH = 80
+HIDDEN_APP_DIR_NAME = ".simple-sticky-notes"
+METADATA_DIR_NAME = "meta"
+LEGACY_NOTES_DIR_NAME = "notes"
+LEGACY_META_DIR_NAME = "meta"
 
 
 class StickyStorage:
     def __init__(self, settings: AppSettings) -> None:
         self.root = Path(settings.storage_root)
-        self.notes_dir = self.root / "notes"
-        self.meta_dir = self.root / "meta"
+        self.notes_dir = self.root
+        self.internal_dir = self.root / HIDDEN_APP_DIR_NAME
+        self.meta_dir = self.internal_dir / METADATA_DIR_NAME
         self.settings = settings
         self._ensure_dirs()
 
     def _ensure_dirs(self) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.internal_dir.mkdir(parents=True, exist_ok=True)
+        mark_hidden_on_windows(self.internal_dir)
+        self._migrate_legacy_layout()
         self.notes_dir.mkdir(parents=True, exist_ok=True)
         self.meta_dir.mkdir(parents=True, exist_ok=True)
 
@@ -171,19 +181,45 @@ class StickyStorage:
     def _note_path_for_metadata(self, metadata: NoteMetadata) -> Path:
         if metadata.file_stem:
             return self.notes_dir / f"{metadata.file_stem}.md"
-        return self._legacy_note_path(metadata.note_id)
+        return self.notes_dir / f"{metadata.note_id}.md"
 
     def _legacy_note_path(self, note_id: str) -> Path:
-        return self.notes_dir / f"{note_id}.md"
+        return self.root / LEGACY_NOTES_DIR_NAME / f"{note_id}.md"
+
+    def _legacy_stemmed_note_path(self, metadata: NoteMetadata) -> Path:
+        if metadata.file_stem:
+            return self.root / LEGACY_NOTES_DIR_NAME / f"{metadata.file_stem}.md"
+        return self._legacy_note_path(metadata.note_id)
 
     def _existing_note_path(self, metadata: NoteMetadata) -> Path:
         current_path = self._note_path_for_metadata(metadata)
         if current_path.exists():
             return current_path
+        legacy_stemmed_path = self._legacy_stemmed_note_path(metadata)
+        if legacy_stemmed_path.exists():
+            return legacy_stemmed_path
         legacy_path = self._legacy_note_path(metadata.note_id)
         if legacy_path.exists():
             return legacy_path
         return current_path
+
+    def _migrate_legacy_layout(self) -> None:
+        legacy_notes_dir = self.root / LEGACY_NOTES_DIR_NAME
+        if legacy_notes_dir.exists():
+            for note_path in legacy_notes_dir.glob("*.md"):
+                destination = self.root / note_path.name
+                if not destination.exists():
+                    note_path.replace(destination)
+            remove_empty_dirs(legacy_notes_dir)
+
+        legacy_meta_dir = self.root / LEGACY_META_DIR_NAME
+        if legacy_meta_dir.exists() and legacy_meta_dir != self.meta_dir:
+            self.meta_dir.mkdir(parents=True, exist_ok=True)
+            for metadata_path in legacy_meta_dir.glob("*.json"):
+                destination = self.meta_dir / metadata_path.name
+                if not destination.exists():
+                    metadata_path.replace(destination)
+            remove_empty_dirs(legacy_meta_dir)
 
 
 def suggested_file_stem(body: str, fallback_title: str) -> str:
@@ -198,3 +234,28 @@ def suggested_file_stem(body: str, fallback_title: str) -> str:
 def collapsed_filename_source(text: str) -> str:
     flattened = " ".join(line.strip().lstrip("#").strip() for line in text.splitlines() if line.strip())
     return flattened or "Untitled note"
+
+
+def remove_empty_dirs(path: Path) -> None:
+    if not path.exists():
+        return
+    for child in sorted(path.iterdir(), reverse=True):
+        if child.is_dir():
+            remove_empty_dirs(child)
+    try:
+        path.rmdir()
+    except OSError:
+        pass
+
+
+def mark_hidden_on_windows(path: Path) -> None:
+    try:
+        attributes = ctypes.windll.kernel32.GetFileAttributesW(str(path))
+        if attributes == -1:
+            return
+        hidden_flag = 0x2
+        if attributes & hidden_flag:
+            return
+        ctypes.windll.kernel32.SetFileAttributesW(str(path), attributes | hidden_flag)
+    except (AttributeError, OSError):
+        return

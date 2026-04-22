@@ -20,8 +20,8 @@ class StickyStorageTests(unittest.TestCase):
 
     def test_create_note_persists_markdown_and_metadata(self) -> None:
         note = self.storage.create_note("Test note")
-        self.assertTrue((Path(self.tempdir.name) / "notes" / f"{note.metadata.file_stem}.md").exists())
-        self.assertTrue((Path(self.tempdir.name) / "meta" / f"{note.metadata.note_id}.json").exists())
+        self.assertTrue((Path(self.tempdir.name) / f"{note.metadata.file_stem}.md").exists())
+        self.assertTrue((Path(self.tempdir.name) / ".simple-sticky-notes" / "meta" / f"{note.metadata.note_id}.json").exists())
         self.assertEqual(note.metadata.title, "Test note")
         self.assertTrue(note.metadata.is_open)
         self.assertEqual(note.metadata.file_stem, "Test note")
@@ -50,7 +50,7 @@ class StickyStorageTests(unittest.TestCase):
         self.storage.hide_note(note.metadata.note_id)
         reloaded = self.storage.load_note(note.metadata.note_id)
         self.assertFalse(reloaded.metadata.is_open)
-        self.assertTrue((Path(self.tempdir.name) / "notes" / f"{reloaded.metadata.file_stem}.md").exists())
+        self.assertTrue((Path(self.tempdir.name) / f"{reloaded.metadata.file_stem}.md").exists())
 
     def test_list_open_notes_filters_hidden_notes(self) -> None:
         note1 = self.storage.create_note("One")
@@ -89,13 +89,33 @@ class StickyStorageTests(unittest.TestCase):
 
     def test_saving_note_renames_markdown_file_from_updated_content(self) -> None:
         note = self.storage.create_note(body="Old title")
-        old_path = Path(self.tempdir.name) / "notes" / "Old title.md"
+        old_path = Path(self.tempdir.name) / "Old title.md"
         self.assertTrue(old_path.exists())
         note.body = "New title"
         note.metadata.title = "New title"
         self.storage.save_note(note)
         self.assertFalse(old_path.exists())
-        self.assertTrue((Path(self.tempdir.name) / "notes" / "New title.md").exists())
+        self.assertTrue((Path(self.tempdir.name) / "New title.md").exists())
+
+    def test_storage_migrates_legacy_notes_and_metadata_layout(self) -> None:
+        root = Path(self.tempdir.name)
+        legacy_notes_dir = root / "notes"
+        legacy_meta_dir = root / "meta"
+        legacy_notes_dir.mkdir()
+        legacy_meta_dir.mkdir()
+        (legacy_notes_dir / "Migrated Note.md").write_text("hello", encoding="utf-8")
+        (legacy_meta_dir / "abc123.json").write_text(
+            '{"note_id":"abc123","title":"Migrated Note","x":1,"y":2,"width":300,"height":200,"is_open":true,"created_at":"2026-01-01T00:00:00+00:00","updated_at":"2026-01-01T00:00:00+00:00","bg_color":"#ffd54f","file_stem":"Migrated Note"}',
+            encoding="utf-8",
+        )
+
+        migrated = StickyStorage(AppSettings(storage_root=self.tempdir.name))
+
+        self.assertTrue((root / "Migrated Note.md").exists())
+        self.assertTrue((root / ".simple-sticky-notes" / "meta" / "abc123.json").exists())
+        self.assertFalse(legacy_notes_dir.exists())
+        self.assertFalse(legacy_meta_dir.exists())
+        self.assertEqual(migrated.load_note("abc123").body, "hello")
 
     def test_suggested_file_stem_sanitizes_invalid_filename_characters(self) -> None:
         self.assertEqual(suggested_file_stem("Plan: finish / ship? *today*", "fallback"), "Plan finish ship today")

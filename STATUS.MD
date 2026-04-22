@@ -24,6 +24,10 @@
 
 ### Pri1
 
+- Enforce a single tray-backed app instance so launching `Simple Sticky Notes` or `--new-note` reuses the running process instead of creating duplicate tray icons.
+- Move a selected note to the right of the current note when chosen from the right-click note list, clamped on-screen.
+- Add `Tidy Onto Main Screen` to the right-click menu so all open notes are moved and resized back onto the primary display.
+- Apply a native Windows drop shadow to frameless note windows if the OS window manager will honor it.
 - Validate the packaged installer end-to-end on this PC, including the detected-vault storage prompt and installed shortcut behavior.
 - Keep the repo and docs aligned with the app as implementation and validation land.
 
@@ -75,6 +79,8 @@
 - Audited the repo for workspace-path assumptions and confirmed the app code resolves its own project paths dynamically, so the project folder itself is safe to move.
 - Validated the moved Dropbox workspace: `python -m unittest -v` passes, timed tray smoke runs succeed, the packaged build succeeds, and rerunning `python main.py --install-windows-integration` repairs Windows shortcuts that still point at the previous folder.
 - Restored the existing git history into the Dropbox workspace by copying the original checkout's `.git` directory, verified `git status` works from the moved repo path, and prepared the workspace for normal commits again.
+- Flattened the storage layout so note markdown files now live directly under `Simple Sticky Notes`, while note metadata migrates into a hidden `.simple-sticky-notes\meta` sidecar folder.
+- Added startup migration for the old `notes\` and visible `meta\` folders so existing installs move forward automatically without losing notes or note state.
 
 ### Pri2
 
@@ -118,3 +124,4 @@
 - Keep the current menu-based font and color controls instead of switching to native Windows chooser dialogs for now.
 - Continue with the current clean implementation rather than adapting an external baseline further.
 - Existing Windows desktop and startup shortcuts must be rebuilt after a repo-folder move because `.lnk` targets embed the old project path.
+- Obsidian-facing storage should keep note markdown files directly in the `Simple Sticky Notes` root and move sidecar metadata into a hidden app-managed folder.

@@ -11,12 +11,14 @@
 
 ## Results
 
-- On `2026-04-22`, `python -m unittest -v` passed `23` tests from the moved workspace root.
+- On `2026-04-22`, `python -m unittest -v` passed `24` tests from the moved workspace root.
 - Coverage now includes:
   - editor display-buffer handling so append-style blank-line focus does not leak unwanted trailing newlines into saved note files
   - content-based markdown filenames and uniqueness suffixes
   - active-vault detection and default storage migration into an Obsidian vault
   - vault-relative Obsidian URI generation for `Edit in Obsidian`
+  - flattened storage layout with markdown files directly under `Simple Sticky Notes`
+  - startup migration from legacy `notes\` and visible `meta\` folders into the current hidden sidecar layout
   - deleted markdown pruning from note menus
   - closing an open sticky when its backing markdown file is deleted
   - releasing the Tk popup grab on repeated context-menu use
