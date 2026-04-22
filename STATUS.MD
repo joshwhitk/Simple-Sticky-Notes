@@ -24,7 +24,6 @@
 
 ### Pri1
 
-- Use a GitHub-backed project structure for `Simple Sticky Notes`.
 - Adapt or build a Windows companion sticky-note app as an alternative to using Obsidian as the runtime.
 * Choose the best baseline implementation to adapt, currently leaning toward `Textylic` because it already has frameless desktop-widget behavior and source is available.
 - Define the storage model for `.md` note content and note window metadata.
@@ -34,7 +33,6 @@
 
 ### Pri1
 
-* Create the initial local git history for this workspace and keep the project GitHub-friendly.
 * Clone the chosen baseline companion app into this workspace.
 * Replace app-specific storage with folder-backed `.md` note files plus sidecar metadata for position, size, font, and restore state.
 * Implement startup/session restore so notes reopen after reboot/login.
@@ -53,6 +51,8 @@
 ### Pri1
 
 * Initialized this workspace as a git repository.
+* Connected this workspace to `https://github.com/joshwhitk/Simple-Sticky-Notes.git`.
+* Created and pushed the initial local git history to the GitHub repo.
 * Installed Obsidian `1.12.7` on this PC.
 * Removed the local `lokus` checkout from this workspace.
 * Created and configured a test Obsidian vault with the `sticky-notes` plugin.
