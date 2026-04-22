@@ -1,5 +1,5 @@
 #define MyAppName "Simple Sticky Notes"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Josh Whitk"
 #define MyAppExeName "Simple Sticky Notes.exe"
 

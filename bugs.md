@@ -18,6 +18,7 @@
 - Window placement bug: choosing another note from the right-click note list only focused it at its previous coordinates, which made note switching awkward and left some notes effectively lost off-screen after monitor/layout changes. Planned fix: anchor note switching to the current note, clamp it to the active work area, and add a `Tidy Onto Main Screen` recovery action for all open notes.
 - Tray duplication bug: launching the app again while it is already running creates a second process and a second tray icon because each launch path starts a fresh `StickyNotesApp` and `pystray.Icon`. Planned fix: enforce a single running instance and forward `--new-note` commands to that existing process.
 - Obsidian layout bug: storing notes under `Simple Sticky Notes\notes\` and metadata under a visible `meta\` folder made the vault view unnecessarily cluttered. Fix applied: note markdown files now live directly under `Simple Sticky Notes`, and metadata migrates into a hidden `.simple-sticky-notes\meta` folder.
+- Installer shortcut bug: the packaged app's post-install `--install-windows-integration` step generated desktop/startup shortcuts that passed `_internal\main.py` to the frozen EXE, which made the shortcuts exit immediately without starting the tray app. Diagnosis: the source-mode shortcut builder was reused unchanged inside the packaged runtime. Fix applied: packaged installs now target the installed EXE directly and pass only supported CLI flags like `--new-note`.
 
 ## Open Bugs
 

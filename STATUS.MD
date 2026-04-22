@@ -29,6 +29,7 @@
 - Add `Tidy Onto Main Screen` to the right-click menu so all open notes are moved and resized back onto the primary display.
 - Apply a native Windows drop shadow to frameless note windows if the OS window manager will honor it.
 - Validate the packaged installer end-to-end on this PC, including the detected-vault storage prompt and installed shortcut behavior.
+- Disable Smart App Control on this developer machine so installer validation is not blocked by reputation-based consumer prompts.
 - Keep the repo and docs aligned with the app as implementation and validation land.
 
 ## Planned
@@ -84,6 +85,8 @@
 - Added README comparison notes explaining why Microsoft Sticky Notes is adjacent but not a substitute for this project's local markdown and Obsidian-compatible storage model.
 - Removed the hand-installed app footprint before installer testing by stopping the live `main.py` tray processes, deleting the Python-created desktop and startup shortcuts, and clearing `%APPDATA%\SimpleStickyNotes` while leaving note content files untouched.
 - Pushed the current local commits to GitHub and prepared the first GitHub release flow with the current Windows installer artifact.
+- Diagnosed the installer launch failure as a packaged-shortcut bug: the post-install Windows integration step was generating shortcuts that passed `_internal\main.py` to the frozen EXE instead of launching the installed EXE directly.
+- Fixed packaged shortcut generation so installer-created desktop and startup shortcuts now target the installed EXE with only supported CLI flags, while source checkouts still use `pythonw.exe main.py`.
 
 ### Pri2
 
