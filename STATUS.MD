@@ -5,109 +5,116 @@
 - App name: `Simple Sticky Notes`.
 - Frameless sticky-note windows for Windows desktop use.
 - Notes are resizable.
-- Notes have a custom close `X` button without a normal Windows title bar/frame.
+- Notes have a custom close `X` button without a normal Windows title bar or frame.
 - Closing a note removes it from the desktop without deleting the note file.
-- Very fast new-note creation from a desktop shortcut/icon.
-- Notes reopen automatically and restore position after reboot/login.
+- Very fast new-note creation from a desktop shortcut or icon.
+- Notes reopen automatically and restore position after reboot or login.
 - Notes remain usable as desktop objects without Obsidian running.
 - Each note remembers position and size.
-- Font family and font size are adjustable in a settings file; no dedicated UX is required initially.
-- Notes persist to a normal file-backed store in a standard Windows user folder, not an opaque app-only database.
+- Font family and font size are adjustable.
+- Notes persist to a normal file-backed store in a standard Windows user location, not an opaque app-only database.
 - Storage is Obsidian-readable markdown: `.md` note bodies plus sidecar metadata.
 - Multiple notes can stay open simultaneously.
 - Autosave should be reliable and low-friction.
-- Startup/login behavior should restore previously open notes.
+- Startup or login behavior should restore previously open notes and leave hidden notes hidden.
 - Open notes should reflect edits made from Obsidian against the shared markdown files.
-- Future adapters can target Obsidian folder storage first, then possibly Joplin/Evernote import or sync paths later.
-- Optional Obsidian integration may provide a control panel for the companion app, but the desktop app remains the runtime owner of sticky notes.
+- Optional Obsidian integration may provide a control panel later, but the desktop app remains the runtime owner of sticky notes.
 
 ## In Progress
 
 ### Pri1
 
-- Adapt or build a Windows companion sticky-note app as an alternative to using Obsidian as the runtime.
-- Define the storage model for `.md` note content and note window metadata.
-- Harden the first working app slice: frameless note window behavior, autosave, and session persistence.
-- Improve note lifecycle semantics so hidden notes stay hidden while open notes restore cleanly after login.
-- Align sticky-note storage with the active Obsidian vault so notes appear inside Obsidian and `Edit in Obsidian` resolves against the real vault.
-- Keep the repo presentable in the usual GitHub way as implementation work lands.
+- Validate the packaged installer end-to-end on this PC, including the detected-vault storage prompt and installed shortcut behavior.
+- Keep the repo and docs aligned with the app as implementation and validation land.
 
 ## Planned
 
 ### Pri2
 
-* Improve note state handling after abnormal shutdowns or forced termination.
-* Fix drag behavior so moving a sticky note window does not select the note text.
-* Fix inconsistent right-click context-menu behavior where some notes do not show the menu even though other open notes do.
+- Improve test coverage for desktop topology changes such as adding, removing, and restoring a second monitor.
+- Improve test coverage for sleep, restart, and other real-world power transitions.
+- Stress-test Obsidian two-way sync under overlapping edits so conflict behavior is well understood before more sync scope is added.
+- Measure idle CPU and memory usage and verify the app and tray process do not keep the PC awake unnecessarily.
 
 ### Pri3
 
-* Evaluate whether Joplin/Evernote interoperability should be import-only, one-way sync, or full read/write.
-* Evaluate replacing the current menu-based font/color controls with native Windows chooser dialogs if the UX gain is worth the complexity.
-* Expand tests beyond storage into more session and integration behaviors.
-* Design an optional Obsidian control panel plugin or settings view for managing the companion app.
-* Decide whether to adapt any external baseline further or continue with the current clean implementation.
+- If an unrecoverable sync conflict ever occurs, preserve both edits in the note instead of silently discarding one side.
+- Decide whether interoperability with other note apps should exist at all, and if it does, whether it should be import-only, one-way sync, or full read-write.
+- Design a settings view for managing the companion app instead of relying only on context menus and config files.
 
 ## Completed
 
 ### Pri1
 
-* Initialized this workspace as a git repository.
-* Connected this workspace to `https://github.com/joshwhitk/Simple-Sticky-Notes.git`.
-* Created and pushed the initial local git history to the GitHub repo.
-* Added a GitHub-friendly repo shape with `README.md`, `docs/`, `CONTRIBUTING.md`, and issue templates.
-* Installed Obsidian `1.12.7` on this PC.
-* Removed the local `lokus` checkout from this workspace.
-* Created and configured a test Obsidian vault with the `sticky-notes` plugin.
-* Determined that the Obsidian plugin route is not the right product basis because notes must survive independently of Obsidian at runtime.
-* Removed the `sticky-notes` Obsidian plugin from the test vault and cleaned up its local source checkout because the project is no longer using that route.
-* Searched GitHub for Windows sticky-note apps and sticky-note integrations with Obsidian/Joplin/Evernote/plaintext storage.
-* Determined there is no strong off-the-shelf GitHub project that already satisfies both the required desktop-window behavior and file-backed note interoperability.
-* Identified `Textylic` as the strongest source-available UI/runtime baseline found so far.
-* Searched Dropbox for likely Evernote and Joplin backup names and found no clear `.enex`, `.jex`, or Joplin profile backup under obvious names.
-* Generated Windows icon assets for `Simple Sticky Notes` from the provided transparent PNG source.
-* Implemented the first standalone app slice in Python/Tkinter with markdown body storage, JSON sidecar metadata, frameless note windows, and a custom close button.
-* Removed the visible note title and visible resize-grip icon so the note looks more like a literal sticky note.
-* Added rounded window corners and an invisible resize zone in place of the default corner grab UI.
-* Flattened the remaining note chrome into the sticky body so the window no longer uses a visible top header strip.
-* Corrected the Win32 rounded-corner implementation to deliver an actual 4px visual corner radius instead of a smaller effective curve.
-* Separated the close-button area from the editable text region so the custom `X` is fully visible instead of being partially overdrawn by note content.
-* Changed focus behavior so clicking the note background returns the caret to an append-style blank line instead of the end of the last content line.
-* Removed the default blue selection look from the text widget and clear selection state after resize/focus transitions.
-* Added regression coverage for the editor display-buffer rule so append-style blank-line focus does not leak extra trailing newlines into saved note files.
-* Implemented Windows shortcut installation for a desktop `New Simple Sticky Note` launcher and a startup shortcut for restoring notes after login.
-* Smoke-tested the app launch path and verified note files and metadata are created under the configured storage root.
-* Verified the updated frameless note window launches cleanly after the chrome-removal changes.
+- Initialized the original local project workspace as a git repository.
+- Connected the project repo to `https://github.com/joshwhitk/Simple-Sticky-Notes.git`.
+- Created and pushed the initial local git history to GitHub.
+- Added a GitHub-friendly repo shape with `README.md`, `docs/`, `CONTRIBUTING.md`, issue templates, runtime requirements, and installer scripts.
+- Installed Obsidian `1.12.7` on this PC.
+- Removed the local `lokus` checkout from this workspace.
+- Determined that the Obsidian plugin route is not the right product basis because notes must survive independently of Obsidian at runtime.
+- Removed the abandoned Obsidian `sticky-notes` plugin path and related local source checkout.
+- Implemented the standalone Python/Tkinter app with markdown body storage, JSON sidecar metadata, frameless note windows, and a custom close button.
+- Removed the visible note title and visible resize-grip icon so the note reads as a literal sticky note.
+- Added rounded window corners and an invisible resize zone in place of the default corner-grab UI.
+- Flattened the remaining note chrome into the sticky body so the window no longer uses a visible top header strip.
+- Corrected the Win32 rounded-corner implementation to deliver an actual 4px visual corner radius.
+- Separated the close-button area from the editable text region so the custom `X` stays fully visible.
+- Changed focus behavior so clicking the note background returns the caret to an append-style blank line instead of the end of the last content line.
+- Removed the default blue trailing selection look from the text widget and clear selection state after resize and focus transitions.
+- Fixed drag behavior by moving window-drag interaction to a dedicated invisible drag zone so dragging the sticky does not select note text.
+- Fixed inconsistent right-click menu behavior by rebuilding menus from current state and releasing the Tk popup grab cleanly every time.
+- Added a system tray icon with note access, new-note creation, and a clean app exit path.
+- Changed app lifecycle behavior so closing the last note leaves the app alive in the tray instead of forcing shutdown.
+- Changed startup behavior so the app no longer creates a blank note when no notes are marked open.
+- Improved note lifecycle semantics so hidden notes stay hidden while open notes restore cleanly after login.
+- Improved note state handling after abnormal shutdowns or forced termination by adding an explicit runtime-state marker and startup reconciliation pass.
+- Implemented Windows shortcut installation for a desktop `New Simple Sticky Note` launcher and a startup shortcut for restoring notes after login.
+- Built a Windows install package and build script that detect an existing Obsidian vault during install and prefill storage accordingly.
+- Smoke-tested the tray-backed app launch path and verified note files and metadata are created under the configured storage root.
+- Audited the repo for workspace-path assumptions and confirmed the app code resolves its own project paths dynamically, so the project folder itself is safe to move.
+- Validated the moved Dropbox workspace: `python -m unittest -v` passes, timed tray smoke runs succeed, the packaged build succeeds, and rerunning `python main.py --install-windows-integration` repairs Windows shortcuts that still point at the previous folder.
+- Restored the existing git history into the Dropbox workspace by copying the original checkout's `.git` directory, verified `git status` works from the moved repo path, and prepared the workspace for normal commits again.
 
 ### Pri2
 
-* Confirmed Obsidian-based sticky-note popouts are tied to Obsidian and therefore do not meet the requirement that notes remain on the desktop when Obsidian is not running.
-* Built the Obsidian `sticky-notes` plugin locally because its documented release ZIP path returned `404`.
-* Diagnosed and fixed local unittest discovery so the repo test command works from the project root.
-* Added a right-click note context menu with a flyout list of sticky notes that shows open/hidden state and can unhide/open a selected note with focus.
-* Added right-click controls for note color, font size, and font family using the installed fonts visible to the app.
-* Added right-click actions for `Show Folder`, `Edit in Notepad`, and `Edit in Obsidian`.
-* Added `Split to New Sticky` when text is selected in the note editor.
-* Extended note metadata persistence to store per-note background color.
-* Switched the default storage location to a standard Windows Documents folder.
-* Added a right-click `Set Storage Folder` action that saves a new storage location for use after restart.
-* Changed note body files from opaque ID-based names to long content-based filenames with `-1` style uniqueness suffixes when needed.
-* Implemented basic 2-way Obsidian sync by detecting external edits to shared markdown files and reloading them into open sticky windows.
-* Aligned the sticky-note storage root with the active Obsidian vault and migrated existing notes there so they are visible inside the current vault.
+- Confirmed Obsidian-based sticky-note popouts are tied to Obsidian and therefore do not meet the requirement that notes remain on the desktop when Obsidian is not running.
+- Built the Obsidian `sticky-notes` plugin locally when its documented release ZIP path returned `404`, then later removed that route entirely.
+- Searched GitHub for Windows sticky-note apps and sticky-note integrations with Obsidian, Joplin, Evernote, and plaintext storage.
+- Determined there is no strong off-the-shelf GitHub project that already satisfies both the required desktop-window behavior and file-backed note interoperability.
+- Identified `Textylic` as the strongest source-available UI and runtime baseline found early in the search.
+- Searched Dropbox for likely Evernote and Joplin backup names and found no clear `.enex`, `.jex`, or Joplin profile backup under obvious names.
+- Generated Windows icon assets for `Simple Sticky Notes` from the provided transparent PNG source.
+- Diagnosed and fixed local unittest discovery so the repo test command works from the project root.
+- Added a right-click note context menu with a flyout list of sticky notes that shows open or hidden state and can reopen a selected note with focus.
+- Added right-click controls for note color, font size, and font family using the installed fonts visible to the app.
+- Added right-click actions for `Show Folder`, `Set Storage Folder`, `Edit in Notepad`, and `Edit in Obsidian`.
+- Added `Split to New Sticky` when text is selected in the note editor.
+- Extended note metadata persistence to store per-note background color.
+- Switched the default storage location to a standard Windows Documents folder, then aligned storage with the active Obsidian vault and migrated existing notes there.
+- Changed note body files from opaque ID-based names to long content-based filenames with `-1` style uniqueness suffixes when needed.
+- Implemented basic 2-way Obsidian sync by detecting external edits to shared markdown files and reloading them into open sticky windows.
+- Improved `Edit in Obsidian` so note launches use vault-relative Obsidian URIs when possible.
+- Fixed note-list refresh so deleting a source `.md` file removes the note from menus and closes any open sticky for that deleted file.
+- Added regression coverage for deleted-note refresh, repeated context-menu popup safety, tray-only startup without forced blank notes, vault-relative Obsidian URIs, and runtime shutdown markers.
+- Verified after a full PC restart that sticky notes loaded again, which is a positive signal for startup restore behavior.
 
 ## Deferred
 
 ### Pri3
 
-* Resume any `lokus` build or evaluation work only if it becomes relevant again.
-* Use Obsidian plugins as a primary sticky-note runtime only if the requirements are relaxed.
+- Resume any `lokus` build or evaluation work only if it becomes relevant again.
+- Use Obsidian plugins as a primary sticky-note runtime only if the product requirements are relaxed.
 
 ## Open Questions For Josh
 
-* None currently.
+- None currently.
 
 ## Resolved Decisions
 
-* Store note bodies as `.md`.
-* Optimize the first version for Obsidian-folder compatibility only.
-* Closed notes stay hidden across reboot unless explicitly reopened.
+- Store note bodies as `.md`.
+- Optimize the first version for Obsidian-folder compatibility only.
+- Closed notes stay hidden across reboot unless explicitly reopened.
+- Keep the current menu-based font and color controls instead of switching to native Windows chooser dialogs for now.
+- Continue with the current clean implementation rather than adapting an external baseline further.
+- Existing Windows desktop and startup shortcuts must be rebuilt after a repo-folder move because `.lnk` targets embed the old project path.

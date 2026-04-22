@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from urllib.parse import quote
 
 
 OBSIDIAN_CONFIG_PATH = Path.home() / "AppData" / "Roaming" / "Obsidian" / "obsidian.json"
@@ -30,3 +31,28 @@ def recommended_storage_root() -> Path:
     if vault_path:
         return vault_path / VAULT_STORAGE_FOLDER
     return Path.home() / "Documents" / VAULT_STORAGE_FOLDER
+
+
+def containing_obsidian_vault(path: Path) -> Path | None:
+    if not OBSIDIAN_CONFIG_PATH.exists():
+        return None
+
+    target = path.resolve()
+    data = json.loads(OBSIDIAN_CONFIG_PATH.read_text(encoding="utf-8"))
+    vaults = data.get("vaults", {})
+    for vault in vaults.values():
+        vault_path = Path(vault.get("path", ""))
+        try:
+            target.relative_to(vault_path.resolve())
+        except (ValueError, FileNotFoundError):
+            continue
+        return vault_path
+    return None
+
+
+def obsidian_open_uri(path: Path) -> str:
+    vault_path = containing_obsidian_vault(path)
+    if vault_path:
+        relative = path.resolve().relative_to(vault_path.resolve()).as_posix()
+        return f"obsidian://open?vault={quote(vault_path.name)}&file={quote(relative)}"
+    return f"obsidian://open?path={quote(str(path))}"

@@ -17,6 +17,7 @@ Thumbs.db
 dist/
 build/
 tmp/
+*.spec
 
 # Obsidian test artifacts
 obsidian-test-vault/

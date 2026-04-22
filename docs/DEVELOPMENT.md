@@ -6,9 +6,10 @@ Current prototype assumptions:
 
 - Windows
 - Python 3.14+
-- Pillow available for icon generation
+- `Pillow` for icon loading and packaging
+- `pystray` for the Windows tray icon and background-app controls
 
-The current runtime uses the Python standard library plus native Windows scripting for shortcut creation.
+The current runtime uses Tkinter plus a small tray dependency, along with native Windows scripting for shortcut creation.
 
 ## Running Locally
 
@@ -28,15 +29,33 @@ Install Windows integration:
 python main.py --install-windows-integration
 ```
 
+Build the packaged app and installer:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1
+```
+
+## Moving The Repo
+
+The app code is portable across workspace moves because project-relative paths are derived from the current file locations at runtime.
+
+After moving the repo folder, rebuild the Windows shortcuts so the desktop and startup launchers stop pointing at the old path:
+
+```powershell
+python main.py --install-windows-integration
+```
+
+If you have an older app process running from the previous location, stop it before relaunching from the new folder.
+
 ## Tests
 
 Run the current unit tests:
 
 ```powershell
-python -m unittest discover -s tests -p "test_*.py" -v
+python -m unittest -v
 ```
 
-The initial test coverage is focused on storage and session-state logic because those parts are deterministic and safe to automate.
+Current automated coverage includes storage behavior, menu regression cases, runtime recovery markers, and Obsidian URI generation because those parts are deterministic and safe to automate.
 
 ## Repo Conventions
 
@@ -47,7 +66,6 @@ The initial test coverage is focused on storage and session-state logic because 
 
 ## Next Development Priorities
 
-- Improve the standalone note window behavior
-- Add better session restore coverage
-- Add smoke-testable Windows integration behavior
-- Package the app for easier installation
+- Validate the packaged installer end-to-end
+- Add broader multi-monitor and power-event coverage
+- Measure idle resource usage

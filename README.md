@@ -18,17 +18,19 @@ The app is intentionally **not** built on top of Obsidian as the runtime. Obsidi
 
 ## Current Status
 
-This repo is in active prototyping. The first implementation slice includes:
+This repo is in active prototyping. The current implementation includes:
 
 - Python/Tkinter app scaffold
 - Markdown file storage inside the active Obsidian vault when available
 - Sidecar metadata for note geometry and open/closed state
 - Content-based markdown filenames with uniqueness suffixes when needed
 - Frameless note window shell with custom close button
+- System tray icon with background-app exit controls
 - Windows desktop/startup shortcut installer
 - Right-click note menu for note switching, colors, fonts, and storage-folder changes
 - External file polling so open stickies can reload markdown edits made from Obsidian
-- Initial storage tests
+- Built Windows installer flow with detected-vault storage prefill
+- Automated tests for storage, menu behavior, runtime recovery, and Obsidian integration
 - Windows icon assets for the app
 
 ## Project Docs
@@ -59,10 +61,24 @@ python main.py --new-note
 python main.py --install-windows-integration
 ```
 
+### Build the packaged app and installer
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1
+```
+
+### Move the repo folder
+
+The repo itself is safe to move to another folder. After the move, rebuild the Windows shortcuts so the desktop and startup launchers stop pointing at the old path:
+
+```powershell
+python main.py --install-windows-integration
+```
+
 ### Run tests
 
 ```powershell
-python -m unittest discover -s tests -p "test_*.py" -v
+python -m unittest -v
 ```
 
 ## Storage Layout
@@ -99,6 +115,7 @@ This allows Obsidian to read the note bodies directly while the desktop app mana
 
 - The desktop app is the runtime owner of notes.
 - Obsidian is a secondary tool that reads the same markdown files.
+- The app can stay alive in the tray even when all notes are hidden.
 - A future Obsidian control panel plugin is acceptable, but it should not become the sticky-note runtime.
 
 ## Why Not Obsidian Pop-Outs?

@@ -28,6 +28,25 @@ class ObsidianIntegrationTests(unittest.TestCase):
                 Path(r"C:\vault-a") / obsidian_integration.VAULT_STORAGE_FOLDER,
             )
 
+    def test_obsidian_open_uri_uses_vault_relative_path_when_possible(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            vault_path = Path(tempdir) / "joshs-stuff"
+            vault_path.mkdir()
+            note_path = vault_path / "Simple Sticky Notes" / "notes" / "Example Note.md"
+            note_path.parent.mkdir(parents=True)
+            note_path.write_text("hello", encoding="utf-8")
+            config_path = Path(tempdir) / "obsidian.json"
+            config_path.write_text(
+                json_text_for_vault(vault_path),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(obsidian_integration, "OBSIDIAN_CONFIG_PATH", config_path):
+                self.assertEqual(
+                    obsidian_integration.obsidian_open_uri(note_path),
+                    "obsidian://open?vault=joshs-stuff&file=Simple%20Sticky%20Notes/notes/Example%20Note.md",
+                )
+
     def test_migrate_default_documents_storage_to_obsidian(self) -> None:
         with tempfile.TemporaryDirectory() as documents_dir, tempfile.TemporaryDirectory() as vault_dir:
             documents_root = Path(documents_dir)
@@ -50,3 +69,8 @@ class ObsidianIntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def json_text_for_vault(vault_path: Path) -> str:
+    escaped = str(vault_path).replace("\\", "\\\\")
+    return f'{{"vaults":{{"first":{{"path":"{escaped}","ts":1,"open":true}}}}}}'

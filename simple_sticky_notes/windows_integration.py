@@ -4,8 +4,8 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
+from .obsidian_integration import obsidian_open_uri
 
 def project_root() -> Path:
     return Path(__file__).resolve().parent.parent
@@ -64,4 +64,4 @@ def edit_in_notepad(path: Path) -> None:
 
 
 def edit_in_obsidian(path: Path) -> None:
-    os.startfile(f"obsidian://open?path={quote(str(path))}")
+    os.startfile(obsidian_open_uri(path))

@@ -9,8 +9,10 @@ from tkinter import messagebox
 from typing import Callable
 
 from .models import NoteRecord
+from .runtime_state import mark_app_launch, mark_clean_shutdown
 from .settings import copy_storage_contents, load_settings, save_settings
 from .storage import StickyStorage
+from .tray import TrayController
 from .windows_integration import edit_in_notepad, edit_in_obsidian, show_folder
 
 
@@ -73,21 +75,30 @@ class NoteWindow:
         self.window.bind("<Configure>", self._on_configure)
         self.window.bind("<ButtonRelease-1>", self._clear_pointer_state)
         self.window.bind("<Motion>", self._update_cursor)
-        self.window.bind("<Button-3>", self._show_context_menu)
 
         self.container = tk.Frame(self.window, highlightthickness=0, bd=0)
         self.container.pack(fill="both", expand=True)
-        self.container.bind("<ButtonPress-1>", self._on_pointer_down)
-        self.container.bind("<B1-Motion>", self._on_pointer_drag)
+        self.container.bind("<ButtonPress-1>", self._on_container_pointer_down)
+        self.container.bind("<B1-Motion>", self._on_container_pointer_drag)
         self.container.bind("<ButtonRelease-1>", self._clear_pointer_state)
-        self.container.bind("<Button-3>", self._show_context_menu)
+
+        self.drag_zone = tk.Frame(self.container, bd=0, highlightthickness=0)
+        self.drag_zone.place(x=0, y=0, relwidth=1.0, width=-TEXT_RIGHT_MARGIN, height=DRAG_ZONE_HEIGHT)
+        self.drag_zone.bind("<ButtonPress-1>", self._on_drag_zone_pointer_down)
+        self.drag_zone.bind("<B1-Motion>", self._on_drag_zone_pointer_drag)
+        self.drag_zone.bind("<ButtonRelease-1>", self._clear_pointer_state)
 
         self.body = tk.Frame(self.container, bd=0, highlightthickness=0)
-        self.body.place(x=0, y=0, relwidth=1.0, relheight=1.0, width=-TEXT_RIGHT_MARGIN, height=0)
-        self.body.bind("<ButtonPress-1>", self._on_pointer_down)
-        self.body.bind("<B1-Motion>", self._on_pointer_drag)
+        self.body.place(
+            x=0,
+            y=DRAG_ZONE_HEIGHT,
+            relwidth=1.0,
+            relheight=1.0,
+            width=-TEXT_RIGHT_MARGIN,
+            height=-DRAG_ZONE_HEIGHT,
+        )
+        self.body.bind("<ButtonPress-1>", self._on_body_pointer_down)
         self.body.bind("<ButtonRelease-1>", self._clear_pointer_state)
-        self.body.bind("<Button-3>", self._show_context_menu)
 
         self.close_button = tk.Button(
             self.container,
@@ -122,7 +133,13 @@ class NoteWindow:
         self.text.bind("<B1-Motion>", self._on_text_pointer_drag)
         self.text.bind("<ButtonRelease-1>", self._clear_pointer_state)
         self.text.bind("<Motion>", self._update_cursor)
-        self.text.bind("<Button-3>", self._show_context_menu)
+
+        self._bind_context_menu(self.window)
+        self._bind_context_menu(self.container)
+        self._bind_context_menu(self.drag_zone)
+        self._bind_context_menu(self.body)
+        self._bind_context_menu(self.text)
+        self._bind_context_menu(self.close_button)
 
         self.apply_visual_style()
         self.apply_font_settings()
@@ -173,6 +190,7 @@ class NoteWindow:
         selection_bg = selection_bg_for(bg_color)
         self.window.configure(bg=bg_color)
         self.container.configure(bg=bg_color)
+        self.drag_zone.configure(bg=bg_color)
         self.body.configure(bg=bg_color)
         self.close_button.configure(
             bg=bg_color,
@@ -230,14 +248,19 @@ class NoteWindow:
             messagebox.showerror("Simple Sticky Notes", str(exc), parent=self.window)
 
     def _show_context_menu(self, event: tk.Event) -> str:
-        self._build_context_menu().tk_popup(event.x_root, event.y_root)
+        self.manager.reconcile_storage(refresh_tray=False)
+        menu = self._build_context_menu()
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
         return "break"
 
     def _build_context_menu(self) -> tk.Menu:
         menu = tk.Menu(self.window, tearoff=0)
 
         notes_menu = tk.Menu(menu, tearoff=0)
-        all_notes = self.storage.list_notes()
+        all_notes = self.manager.list_notes_for_menu()
         if all_notes:
             for listed_note in all_notes:
                 label = note_menu_label(listed_note)
@@ -363,24 +386,35 @@ class NoteWindow:
         target = event.widget if isinstance(event.widget, tk.Misc) else self.window
         target.configure(cursor=cursor)
 
-    def _on_pointer_down(self, event: tk.Event) -> str | None:
+    def _on_container_pointer_down(self, event: tk.Event) -> str | None:
         local_x, local_y = self._local_pointer(event)
         if self._is_resize_hotspot(local_x, local_y):
             self._start_resize(event)
             return "break"
         if self._is_drag_zone(local_x, local_y):
-            self._start_drag(event)
             return "break"
         self._focus_editor_for_append()
         return None
 
-    def _on_pointer_drag(self, event: tk.Event) -> str | None:
+    def _on_container_pointer_drag(self, event: tk.Event) -> str | None:
         if self._resize_origin:
             self._resize(event)
             return "break"
+        return None
+
+    def _on_drag_zone_pointer_down(self, event: tk.Event) -> str | None:
+        self._clear_selection()
+        self._start_drag(event)
+        return "break"
+
+    def _on_drag_zone_pointer_drag(self, event: tk.Event) -> str | None:
         if self._drag_origin:
             self._drag(event)
             return "break"
+        return None
+
+    def _on_body_pointer_down(self, _event: tk.Event) -> str | None:
+        self._focus_editor_for_append()
         return None
 
     def _on_text_pointer_down(self, event: tk.Event) -> str | None:
@@ -388,25 +422,20 @@ class NoteWindow:
         if self._is_resize_hotspot(local_x, local_y):
             self._start_resize(event)
             return "break"
-        if self._is_drag_zone(local_x, local_y):
-            self._start_drag(event)
-            return "break"
         return None
 
     def _on_text_pointer_drag(self, event: tk.Event) -> str | None:
         if self._resize_origin:
             self._resize(event)
             return "break"
-        if self._drag_origin:
-            self._drag(event)
-            return "break"
         return None
 
     def _clear_pointer_state(self, _event: tk.Event | None = None) -> None:
         resized = self._resize_origin is not None
+        dragged = self._drag_origin is not None
         self._drag_origin = None
         self._resize_origin = None
-        if resized:
+        if resized or dragged:
             self._clear_selection()
 
     def _is_drag_zone(self, x: int, y: int) -> bool:
@@ -424,8 +453,8 @@ class NoteWindow:
     def _cursor_for_widget(self, widget: object, x: int, y: int) -> str:
         if self._is_resize_hotspot(x, y):
             return "size_nw_se"
-        if self._is_drag_zone(x, y):
-            return "arrow"
+        if widget == self.drag_zone:
+            return "fleur"
         if widget == self.text:
             return "xterm"
         return "arrow"
@@ -462,6 +491,9 @@ class NoteWindow:
             return
         if self._autosave_job:
             return
+        if current_signature is None:
+            self._handle_deleted_from_disk()
+            return
 
         disk_body = self._current_disk_body()
         self._last_disk_signature = current_signature
@@ -490,26 +522,51 @@ class NoteWindow:
             return ""
         return note_path.read_text(encoding="utf-8")
 
+    def _handle_deleted_from_disk(self) -> None:
+        if self._autosave_job:
+            try:
+                self.window.after_cancel(self._autosave_job)
+            except tk.TclError:
+                pass
+            self._autosave_job = None
+        if self._external_sync_job:
+            try:
+                self.window.after_cancel(self._external_sync_job)
+            except tk.TclError:
+                pass
+            self._external_sync_job = None
+        self.storage.delete_note(self.note.metadata.note_id, delete_body=False)
+        self.window.destroy()
+        self.manager.unregister(self.note.metadata.note_id)
+
+    def _bind_context_menu(self, widget: tk.Misc) -> None:
+        widget.bind("<Button-2>", self._show_context_menu)
+        widget.bind("<Button-3>", self._show_context_menu)
+
 
 class StickyNotesApp:
     def __init__(self) -> None:
         self.settings = load_settings()
         self.storage = StickyStorage(self.settings)
         self.windows: dict[str, NoteWindow] = {}
+        self._is_shutting_down = False
+        self.session_id = ""
+        self.previous_shutdown_clean = True
         self.root = tk.Tk()
         self.root.withdraw()
         self.root.protocol("WM_DELETE_WINDOW", self.shutdown)
+        self.tray = TrayController(self)
 
     def run(self, *, create_new_note: bool = False) -> int:
+        self.session_id, self.previous_shutdown_clean = mark_app_launch()
+        self.tray.start()
+        self.reconcile_storage()
         if create_new_note:
             self.new_note()
         else:
             open_notes = self.storage.list_open_notes()
-            if not open_notes:
-                self.new_note()
-            else:
-                for note in open_notes:
-                    self.open_note(note)
+            for note in open_notes:
+                self.open_note(note)
 
         self.root.mainloop()
         return 0
@@ -546,6 +603,7 @@ class StickyNotesApp:
         window = NoteWindow(self, note)
         self.windows[note.metadata.note_id] = window
         window.focus_for_edit()
+        self.tray.refresh()
 
     def show_note(self, note_id: str) -> None:
         existing = self.windows.get(note_id)
@@ -553,7 +611,11 @@ class StickyNotesApp:
             existing.focus_for_edit()
             return
 
-        stored_note = self.storage.load_note(note_id)
+        try:
+            stored_note = self.storage.load_note(note_id)
+        except FileNotFoundError:
+            self.reconcile_storage()
+            return
         if not stored_note.metadata.is_open:
             stored_note = self.storage.reopen_note(note_id)
         self.open_note(stored_note)
@@ -567,6 +629,7 @@ class StickyNotesApp:
         for window in self.windows.values():
             window.apply_font_settings()
             window.flush_note()
+        self.tray.refresh()
 
     def available_font_families(self) -> list[str]:
         installed = set(tkfont.families(self.root))
@@ -606,15 +669,30 @@ class StickyNotesApp:
 
     def unregister(self, note_id: str) -> None:
         self.windows.pop(note_id, None)
-        if not self.windows:
-            self.shutdown()
+        self.tray.refresh()
+
+    def list_notes_for_menu(self) -> list[NoteRecord]:
+        self.reconcile_storage(refresh_tray=False)
+        return self.storage.list_notes()
+
+    def reconcile_storage(self, *, refresh_tray: bool = True) -> None:
+        self.storage.prune_missing_note_files(protected_note_ids=set(self.windows))
+        if refresh_tray:
+            self.tray.refresh()
 
     def shutdown(self) -> None:
+        if self._is_shutting_down:
+            return
+        self._is_shutting_down = True
+        if self.session_id:
+            mark_clean_shutdown(self.session_id)
+        self.tray.stop()
         for window in list(self.windows.values()):
             try:
                 window.flush_note()
             except tk.TclError:
                 pass
+        self.windows.clear()
         self.root.quit()
         self.root.destroy()
 

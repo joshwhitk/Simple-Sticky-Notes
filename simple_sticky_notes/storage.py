@@ -93,7 +93,13 @@ class StickyStorage:
         return sorted(path.stem for path in self.meta_dir.glob("*.json"))
 
     def list_notes(self) -> list[NoteRecord]:
-        return [self.load_note(note_id) for note_id in self.list_note_ids()]
+        notes: list[NoteRecord] = []
+        for note_id in self.list_note_ids():
+            try:
+                notes.append(self.load_note(note_id))
+            except FileNotFoundError:
+                continue
+        return notes
 
     def list_open_notes(self) -> list[NoteRecord]:
         return [note for note in self.list_notes() if note.metadata.is_open]
@@ -116,6 +122,33 @@ class StickyStorage:
         note.metadata.is_open = True
         self.save_note(note)
         return note
+
+    def delete_note(self, note_id: str, *, delete_body: bool = True) -> None:
+        metadata_path = self.meta_path(note_id)
+        if not metadata_path.exists():
+            return
+
+        metadata = self._load_metadata(note_id)
+        note_path = self._existing_note_path(metadata)
+        if delete_body and note_path.exists():
+            note_path.unlink()
+        metadata_path.unlink(missing_ok=True)
+
+    def prune_missing_note_files(self, *, protected_note_ids: set[str] | None = None) -> list[str]:
+        protected = protected_note_ids or set()
+        removed: list[str] = []
+        for note_id in self.list_note_ids():
+            if note_id in protected:
+                continue
+            try:
+                metadata = self._load_metadata(note_id)
+            except FileNotFoundError:
+                continue
+            if self._existing_note_path(metadata).exists():
+                continue
+            self.meta_path(note_id).unlink(missing_ok=True)
+            removed.append(note_id)
+        return removed
 
     def make_unique_file_stem(self, note_id: str, body: str, fallback_title: str) -> str:
         base_stem = suggested_file_stem(body, fallback_title)

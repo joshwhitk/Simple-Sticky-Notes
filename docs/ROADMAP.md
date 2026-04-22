@@ -2,25 +2,19 @@
 
 ## Near Term
 
-- Stabilize the standalone desktop note runtime
-- Finalize markdown-plus-sidecar storage
-- Finish startup/session restore
-- Generate usable Windows shortcuts and icons
-- Expand tests around storage and restore behavior
+- Validate the packaged installer end-to-end
+- Expand tests for multi-monitor, power-event, and sync-stress behavior
+- Measure idle resource usage and confirm the tray process stays quiet when idle
 
 ## Medium Term
 
-- Improve note lifecycle behavior:
-  - hidden
-  - reopened
-  - archived
-- Improve visual polish of frameless windows
-- Add packaging and installer workflow
 - Add better settings management
+- Refine multi-note management and recovery UX after unusual desktop changes
+- Decide whether sync-conflict handling needs explicit dual-version preservation
 
 ## Longer Term
 
 - Add an Obsidian control panel plugin for companion management
-- Explore import-only paths for older note systems
+- Decide whether any other note-app interoperability is worth supporting at all
 - Improve multi-note management UX
 - Add richer metadata and search support

@@ -1,78 +1,78 @@
 # Regression Tests
 
 ## Planned
-- Add regression coverage only if this work uncovers a repeated defect or a bug that needs a durable test.
+
+- Add durable regression coverage when a bug repeats or a manual finding reveals a realistic failure mode that should stay fixed.
 
 ## Run Before Shipping
-- No project-specific regression suite identified yet.
+
+- `python -m unittest -v`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1`
 
 ## Results
-- No local regression suite was applicable for this install/setup task.
-- Verification performed:
-  - `winget list Obsidian.Obsidian` confirmed Obsidian `1.12.7` is installed.
-  - Verified the Obsidian executable exists under the standard per-user install location.
-  - Built `obsidian-sticky-notes-plugin` from source with `npm install` and `npm run build`.
-  - Verified plugin artifacts copied into the test vault and that launching Obsidian against the vault generated normal vault state files including `.obsidian\workspace.json`.
-  - Current app tests run with `python -m unittest discover -s tests -p "test_*.py" -v`.
-  - Verified `python -m unittest -v` now discovers and runs the same tests from the repo root.
-  - Verified `python main.py --install-windows-integration` created:
+
+- On `2026-04-22`, `python -m unittest -v` passed `23` tests from the moved workspace root.
+- Coverage now includes:
+  - editor display-buffer handling so append-style blank-line focus does not leak unwanted trailing newlines into saved note files
+  - content-based markdown filenames and uniqueness suffixes
+  - active-vault detection and default storage migration into an Obsidian vault
+  - vault-relative Obsidian URI generation for `Edit in Obsidian`
+  - deleted markdown pruning from note menus
+  - closing an open sticky when its backing markdown file is deleted
+  - releasing the Tk popup grab on repeated context-menu use
+  - tray-only startup without forcing a new blank note
+  - runtime-state markers for unclean-launch and clean-shutdown tracking
+
+- Verified desktop integration:
+  - `python main.py --install-windows-integration` creates:
     - `%USERPROFILE%\Desktop\New Simple Sticky Note.lnk`
     - `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Simple Sticky Notes.lnk`
-  - Verified launching `python main.py --new-note` creates `.md` and `.json` note files under the configured storage root.
-  - Verified `python -m unittest -v` still passes after the frameless note UI changes.
-  - Added regression coverage for the editor buffer helpers so the UI can keep a blank append line without persisting an unwanted extra newline into saved note files.
-  - Added coverage for richer note creation metadata, note-menu state labels, and sticky-themed selection-color derivation.
-  - Added coverage for content-based markdown filenames, `-1` collision suffixes, and legacy-storage migration into the new default Documents location.
-  - Added coverage for detecting the active Obsidian vault and migrating the default Documents storage into the vault-backed location.
-  - Verified the append-focus diagnostic lands the caret on the blank line and the text body reserves space for the close button:
-    ```powershell
-    @'
-    from simple_sticky_notes.app import StickyNotesApp, TEXT_RIGHT_MARGIN
-    app = StickyNotesApp()
-    app.new_note()
-    window = next(iter(app.windows.values()))
-    window.text.delete('1.0', 'end')
-    window.text.insert('1.0', 'wow this looks good!\n')
-    app.root.update_idletasks()
-    window._focus_editor_for_append()
-    app.root.update_idletasks()
-    print(f"insert_index={window.text.index('insert')}")
-    print(f"body_width={window.body.winfo_width()}")
-    print(f"window_width={window.window.winfo_width()}")
-    print(f"expected_margin={TEXT_RIGHT_MARGIN}")
-    window.hide_note()
-    '@ | python -
-    ```
-    Expected result:
-    - `insert_index=2.0`
-  - Verified a GUI diagnostic for the new context-menu slice:
+  - after the workspace move, inspecting the existing `.lnk` files confirmed they still targeted the previous folder
+  - rerunning `python main.py --install-windows-integration` from the moved workspace rewrote both shortcut targets to the current workspace
+
+- Verified runtime diagnostics:
+  - timed tray-backed smoke run without forcing a new note exits cleanly:
     ```powershell
     @'
     from simple_sticky_notes.app import StickyNotesApp
     app = StickyNotesApp()
-    app.new_note()
-    window = next(iter(app.windows.values()))
-    window.text.delete('1.0', 'end')
-    window.text.insert('1.0', 'first line\nsecond line\n')
-    window.text.tag_add('sel', '1.0', '1.10')
-    menu = window._build_context_menu()
-    window.set_color('#bbdefb')
-    window.split_selection_to_new_sticky()
-    app.root.update_idletasks()
-    print(f"menu_entries={menu.index('end')}")
-    print(f"open_windows={len(app.windows)}")
-    print(f"first_note_color={window.note.metadata.bg_color}")
-    print(f"saved_color={app.storage.load_note(window.note.metadata.note_id).metadata.bg_color}")
-    for open_window in list(app.windows.values()):
-        open_window.hide_note()
+    app.root.after(1200, app.shutdown)
+    result = app.run(create_new_note=False)
+    print(f"tray_gui_smoke={result}")
     '@ | python -
     ```
-    Expected results:
-    - `open_windows=2`
-    - `first_note_color=#bbdefb`
-    - `saved_color=#bbdefb`
-  - Verified `Edit in Notepad` launches a real note file successfully.
-  - Verified a runtime filename diagnostic creates a content-based markdown filename:
+    Expected result:
+    - `tray_gui_smoke=0`
+
+  - timed tray-backed smoke run with a new note exits cleanly:
+    ```powershell
+    @'
+    from simple_sticky_notes.app import StickyNotesApp
+    app = StickyNotesApp()
+    app.root.after(1200, app.shutdown)
+    result = app.run(create_new_note=True)
+    print(f"new_note_tray_smoke={result}")
+    '@ | python -
+    ```
+    Expected result:
+    - `new_note_tray_smoke=0`
+
+  - packaged app smoke check confirms the built executable stays alive long enough to launch successfully before forced shutdown for the test harness:
+    ```powershell
+    $exe = Join-Path (Get-Location) 'dist\Simple Sticky Notes\Simple Sticky Notes.exe'
+    $proc = Start-Process -FilePath $exe -PassThru
+    Start-Sleep -Seconds 2
+    $alive = -not $proc.HasExited
+    Write-Output "packaged_exe_alive_after_2s=$alive"
+    if ($alive) {
+      Stop-Process -Id $proc.Id -Force
+      $proc.WaitForExit()
+    }
+    ```
+    Expected result:
+    - `packaged_exe_alive_after_2s=True`
+
+  - content-based filename diagnostic still produces a long markdown filename from note content:
     ```powershell
     @'
     from simple_sticky_notes.app import StickyNotesApp
@@ -81,18 +81,18 @@
     window = next(iter(app.windows.values()))
     window.flush_note()
     print(f"note_file={app.storage.note_path(window.note.metadata.note_id).name}")
-    for open_window in list(app.windows.values()):
-        open_window.hide_note()
+    app.shutdown()
     '@ | python -
     ```
     Expected result:
     - `note_file=This note filename should follow the body content.md`
-  - Verified a runtime 2-way sync diagnostic reloads an external markdown edit and updates the note filename accordingly:
+
+  - 2-way sync diagnostic still reloads an external markdown edit and updates the note filename accordingly:
     ```powershell
     @'
     import time
     from simple_sticky_notes.app import StickyNotesApp, persisted_body_from_editor
-    
+
     app = StickyNotesApp()
     app.create_and_open_note(body='Original body')
     window = next(iter(app.windows.values()))
@@ -104,21 +104,22 @@
     app.root.update_idletasks()
     print(f"reloaded_body={persisted_body_from_editor(window.text.get('1.0', 'end-1c'))}")
     print(f"renamed_file={app.storage.note_path(window.note.metadata.note_id).name}")
-    for open_window in list(app.windows.values()):
-        open_window.hide_note()
+    app.shutdown()
     '@ | python -
     ```
     Expected results:
     - `reloaded_body=Updated from Obsidian`
     - `renamed_file=Updated from Obsidian.md`
-  - Verified live settings migration moved the active storage root into the current Obsidian vault and copied notes there.
-  - Verified a timed GUI smoke launch completes without Tk errors:
+
+- Verified packaging:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1` succeeds from the moved workspace
+  - resulting artifacts are created at:
+    - `dist\Simple Sticky Notes\`
+    - `dist\installer\Simple-Sticky-Notes-Setup.exe`
+
+- Verified move-readiness:
+  - audited the repo for hardcoded workspace-path references outside generated caches and build artifacts and found none in active source or docs
+  - confirmed project-path-sensitive runtime behavior is isolated to generated Windows shortcuts, which can be repaired by rerunning:
     ```powershell
-    @'
-    from simple_sticky_notes.app import StickyNotesApp
-    app = StickyNotesApp()
-    app.root.after(900, app.shutdown)
-    result = app.run(create_new_note=True)
-    print(f"gui_smoke={result}")
-    '@ | python -
+    python main.py --install-windows-integration
     ```
