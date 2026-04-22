@@ -8,6 +8,7 @@ Simple Sticky Notes is a standalone Windows desktop app.
 - Note content is stored as markdown files in a standard user-accessible Windows folder.
 - Metadata is stored separately in JSON sidecars.
 - Obsidian is a companion reader/editor for the same note files, not the runtime.
+- Open sticky windows poll their backing markdown files so external edits can flow back into the desktop UI.
 
 ## Current Modules
 

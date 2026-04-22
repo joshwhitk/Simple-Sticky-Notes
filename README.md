@@ -11,6 +11,7 @@ The app is intentionally **not** built on top of Obsidian as the runtime. Obsidi
 - Resizable note windows
 - Reliable autosave
 - Markdown note storage plus sidecar metadata
+- 2-way shared-file sync with Obsidian edits
 - Restore open notes and positions after reboot/login
 - Fast desktop shortcut for creating a new note
 - Obsidian-compatible file storage
@@ -26,6 +27,7 @@ This repo is in active prototyping. The first implementation slice includes:
 - Frameless note window shell with custom close button
 - Windows desktop/startup shortcut installer
 - Right-click note menu for note switching, colors, fonts, and storage-folder changes
+- External file polling so open stickies can reload markdown edits made from Obsidian
 - Initial storage tests
 - Windows icon assets for the app
 

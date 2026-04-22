@@ -17,6 +17,7 @@ from .windows_integration import edit_in_notepad, edit_in_obsidian, show_folder
 DEFAULT_NOTE_BG = "#ffd54f"
 NOTE_TEXT = "#1f2933"
 CORNER_RADIUS = 4
+EXTERNAL_SYNC_POLL_MS = 1000
 MIN_WIDTH = 180
 MIN_HEIGHT = 120
 DRAG_ZONE_HEIGHT = 28
@@ -57,6 +58,7 @@ class NoteWindow:
         self.storage = manager.storage
         self.note = note
         self._autosave_job: str | None = None
+        self._external_sync_job: str | None = None
         self._drag_origin: tuple[int, int] | None = None
         self._resize_origin: tuple[int, int, int, int] | None = None
 
@@ -126,6 +128,8 @@ class NoteWindow:
         self.apply_font_settings()
         self._apply_rounded_corners()
         self._position_controls()
+        self._last_disk_signature = self._current_disk_signature()
+        self._schedule_external_sync()
 
     def show(self) -> None:
         self.window.deiconify()
@@ -137,12 +141,21 @@ class NoteWindow:
         self._focus_editor_for_append()
 
     def hide_note(self) -> None:
+        if self._external_sync_job:
+            self.window.after_cancel(self._external_sync_job)
+            self._external_sync_job = None
         self.flush_note()
         self.storage.hide_note(self.note.metadata.note_id)
         self.window.destroy()
         self.manager.unregister(self.note.metadata.note_id)
 
     def flush_note(self) -> None:
+        if self._autosave_job:
+            try:
+                self.window.after_cancel(self._autosave_job)
+            except tk.TclError:
+                pass
+            self._autosave_job = None
         body = persisted_body_from_editor(self.text.get("1.0", "end-1c"))
         self.note.body = body
         self.note.metadata.title = first_line_title(body)
@@ -153,6 +166,7 @@ class NoteWindow:
         self.note.metadata.height = height
         self.note.metadata.is_open = True
         self.storage.save_note(self.note)
+        self._last_disk_signature = self._current_disk_signature()
 
     def apply_visual_style(self) -> None:
         bg_color = self.note.metadata.bg_color or DEFAULT_NOTE_BG
@@ -418,15 +432,63 @@ class NoteWindow:
 
     def _on_focus_in(self, _event: tk.Event) -> None:
         self._clear_selection()
+        self._refresh_from_disk_if_needed()
 
     def _focus_editor_for_append(self) -> None:
         self.text.focus_set()
+        self._place_insert_at_append()
+
+    def _clear_selection(self) -> None:
+        self.text.tag_remove("sel", "1.0", "end")
+
+    def _place_insert_at_append(self) -> None:
         self._clear_selection()
         self.text.mark_set("insert", "end-1c")
         self.text.see("insert")
 
-    def _clear_selection(self) -> None:
-        self.text.tag_remove("sel", "1.0", "end")
+    def _schedule_external_sync(self) -> None:
+        self._external_sync_job = self.window.after(EXTERNAL_SYNC_POLL_MS, self._poll_external_changes)
+
+    def _poll_external_changes(self) -> None:
+        try:
+            self._refresh_from_disk_if_needed()
+        finally:
+            if self.window.winfo_exists():
+                self._schedule_external_sync()
+
+    def _refresh_from_disk_if_needed(self) -> None:
+        current_signature = self._current_disk_signature()
+        if current_signature == self._last_disk_signature:
+            return
+        if self._autosave_job:
+            return
+
+        disk_body = self._current_disk_body()
+        self._last_disk_signature = current_signature
+        if disk_body == self.note.body:
+            return
+
+        self.note.body = disk_body
+        self.note.metadata.title = first_line_title(disk_body)
+        self.storage.save_note(self.note)
+        self._last_disk_signature = self._current_disk_signature()
+        self.text.delete("1.0", "end")
+        self.text.insert("1.0", editor_body_for_display(disk_body))
+        self.text.edit_modified(False)
+        self._place_insert_at_append()
+
+    def _current_disk_signature(self) -> tuple[str, int, int] | None:
+        note_path = self.storage.note_path(self.note.metadata.note_id)
+        if not note_path.exists():
+            return None
+        stat = note_path.stat()
+        return (str(note_path), stat.st_mtime_ns, stat.st_size)
+
+    def _current_disk_body(self) -> str:
+        note_path = self.storage.note_path(self.note.metadata.note_id)
+        if not note_path.exists():
+            return ""
+        return note_path.read_text(encoding="utf-8")
 
 
 class StickyNotesApp:

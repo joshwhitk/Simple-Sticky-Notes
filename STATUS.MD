@@ -17,6 +17,7 @@
 - Multiple notes can stay open simultaneously.
 - Autosave should be reliable and low-friction.
 - Startup/login behavior should restore previously open notes.
+- Open notes should reflect edits made from Obsidian against the shared markdown files.
 - Future adapters can target Obsidian folder storage first, then possibly Joplin/Evernote import or sync paths later.
 - Optional Obsidian integration may provide a control panel for the companion app, but the desktop app remains the runtime owner of sticky notes.
 
@@ -32,19 +33,17 @@
 
 ## Planned
 
-### Pri1
+### Pri2
 
 * Improve note state handling after abnormal shutdowns or forced termination.
+
+### Pri3
+
+* Evaluate whether Joplin/Evernote interoperability should be import-only, one-way sync, or full read/write.
+* Evaluate replacing the current menu-based font/color controls with native Windows chooser dialogs if the UX gain is worth the complexity.
 * Expand tests beyond storage into more session and integration behaviors.
 * Design an optional Obsidian control panel plugin or settings view for managing the companion app.
 * Decide whether to adapt any external baseline further or continue with the current clean implementation.
-
-### Pri2
-
-* Search local machine or other storage locations for clearer Joplin/Evernote exports if Dropbox remains inconclusive.
-* Add import or adapter design for older plain-text note sources such as Dropbox `locaytanotes` if useful.
-* Evaluate whether Joplin/Evernote interoperability should be import-only, one-way sync, or full read/write.
-* Evaluate replacing the current menu-based font/color controls with native Windows chooser dialogs if the UX gain is worth the complexity.
 
 ## Completed
 
@@ -89,6 +88,7 @@
 * Switched the default storage location to a standard Windows Documents folder.
 * Added a right-click `Set Storage Folder` action that saves a new storage location for use after restart.
 * Changed note body files from opaque ID-based names to long content-based filenames with `-1` style uniqueness suffixes when needed.
+* Implemented basic 2-way Obsidian sync by detecting external edits to shared markdown files and reloading them into open sticky windows.
 
 ## Deferred
 

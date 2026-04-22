@@ -81,8 +81,11 @@ class StickyStorage:
             current_path.rename(desired_path)
 
         desired_path.write_text(note.body, encoding="utf-8")
-        self.meta_path(note.metadata.note_id).write_text(
-            json.dumps(asdict(note.metadata), indent=2),
+        self.save_metadata(note.metadata)
+
+    def save_metadata(self, metadata: NoteMetadata) -> None:
+        self.meta_path(metadata.note_id).write_text(
+            json.dumps(asdict(metadata), indent=2),
             encoding="utf-8",
         )
 

@@ -86,6 +86,30 @@
     ```
     Expected result:
     - `note_file=This note filename should follow the body content.md`
+  - Verified a runtime 2-way sync diagnostic reloads an external markdown edit and updates the note filename accordingly:
+    ```powershell
+    @'
+    import time
+    from simple_sticky_notes.app import StickyNotesApp, persisted_body_from_editor
+    
+    app = StickyNotesApp()
+    app.create_and_open_note(body='Original body')
+    window = next(iter(app.windows.values()))
+    window.flush_note()
+    note_path_before = app.storage.note_path(window.note.metadata.note_id)
+    note_path_before.write_text('Updated from Obsidian', encoding='utf-8')
+    time.sleep(0.02)
+    window._refresh_from_disk_if_needed()
+    app.root.update_idletasks()
+    print(f"reloaded_body={persisted_body_from_editor(window.text.get('1.0', 'end-1c'))}")
+    print(f"renamed_file={app.storage.note_path(window.note.metadata.note_id).name}")
+    for open_window in list(app.windows.values()):
+        open_window.hide_note()
+    '@ | python -
+    ```
+    Expected results:
+    - `reloaded_body=Updated from Obsidian`
+    - `renamed_file=Updated from Obsidian.md`
   - Verified a timed GUI smoke launch completes without Tk errors:
     ```powershell
     @'
