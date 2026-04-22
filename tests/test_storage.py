@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from simple_sticky_notes.models import AppSettings
+from simple_sticky_notes.app import editor_body_for_display, persisted_body_from_editor
 from simple_sticky_notes.storage import StickyStorage
 
 
@@ -38,6 +39,17 @@ class StickyStorageTests(unittest.TestCase):
         open_ids = {note.metadata.note_id for note in self.storage.list_open_notes()}
         self.assertNotIn(note1.metadata.note_id, open_ids)
         self.assertIn(note2.metadata.note_id, open_ids)
+
+    def test_editor_body_adds_blank_append_line_without_changing_saved_body(self) -> None:
+        stored = "wow this looks good!"
+        displayed = editor_body_for_display(stored)
+        self.assertEqual(displayed, "wow this looks good!\n")
+        self.assertEqual(persisted_body_from_editor(displayed), stored)
+
+    def test_editor_body_preserves_one_intentional_trailing_blank_line(self) -> None:
+        stored = "line one\n\n"
+        displayed = editor_body_for_display(stored)
+        self.assertEqual(persisted_body_from_editor(displayed), stored)
 
 
 if __name__ == "__main__":

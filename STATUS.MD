@@ -44,6 +44,10 @@
 * Search local machine or other storage locations for clearer Joplin/Evernote exports if Dropbox remains inconclusive.
 * Add import or adapter design for older plain-text note sources such as Dropbox `locaytanotes` if useful.
 * Evaluate whether Joplin/Evernote interoperability should be import-only, one-way sync, or full read/write.
+* Add a Windows right-click context menu with a flyout list of sticky notes that shows open/hidden state and can unhide/open a selected note with focus.
+* Add right-click menu controls for note color, font size, and font family, using standard Windows pickers where practical.
+* Add right-click actions for `Show Folder`, `Edit in Notepad`, and `Edit in Obsidian`.
+* Add a context-menu action `Split to New Sticky` when text is selected.
 
 ## Completed
 
@@ -67,6 +71,10 @@
 * Added rounded window corners and an invisible resize zone in place of the default corner grab UI.
 * Flattened the remaining note chrome into the sticky body so the window no longer uses a visible top header strip.
 * Corrected the Win32 rounded-corner implementation to deliver an actual 4px visual corner radius instead of a smaller effective curve.
+* Separated the close-button area from the editable text region so the custom `X` is fully visible instead of being partially overdrawn by note content.
+* Changed focus behavior so clicking the note background returns the caret to an append-style blank line instead of the end of the last content line.
+* Removed the default blue selection look from the text widget and clear selection state after resize/focus transitions.
+* Added regression coverage for the editor display-buffer rule so append-style blank-line focus does not leak extra trailing newlines into saved note files.
 * Implemented Windows shortcut installation for a desktop `New Simple Sticky Note` launcher and a startup shortcut for restoring notes after login.
 * Smoke-tested the app launch path and verified note files and metadata are created under `C:\Users\Josh\Dropbox\backups\josh-obsidian\simple-sticky-notes\`.
 * Verified the updated frameless note window launches cleanly after the chrome-removal changes.

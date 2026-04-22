@@ -20,6 +20,28 @@
     - `C:\Users\Josh\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\Simple Sticky Notes.lnk`
   - Verified launching `python main.py --new-note` creates `.md` and `.json` note files under `C:\Users\Josh\Dropbox\backups\josh-obsidian\simple-sticky-notes\`.
   - Verified `python -m unittest -v` still passes after the frameless note UI changes.
+  - Added regression coverage for the editor buffer helpers so the UI can keep a blank append line without persisting an unwanted extra newline into saved note files.
+  - Verified the append-focus diagnostic lands the caret on the blank line and the text body reserves space for the close button:
+    ```powershell
+    @'
+    from simple_sticky_notes.app import StickyNotesApp, TEXT_RIGHT_MARGIN
+    app = StickyNotesApp()
+    app.new_note()
+    window = next(iter(app.windows.values()))
+    window.text.delete('1.0', 'end')
+    window.text.insert('1.0', 'wow this looks good!\n')
+    app.root.update_idletasks()
+    window._focus_editor_for_append()
+    app.root.update_idletasks()
+    print(f"insert_index={window.text.index('insert')}")
+    print(f"body_width={window.body.winfo_width()}")
+    print(f"window_width={window.window.winfo_width()}")
+    print(f"expected_margin={TEXT_RIGHT_MARGIN}")
+    window.hide_note()
+    '@ | python -
+    ```
+    Expected result:
+    - `insert_index=2.0`
   - Verified a timed GUI smoke launch completes without Tk errors:
     ```powershell
     @'

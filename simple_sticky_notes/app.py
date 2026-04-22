@@ -17,6 +17,8 @@ DRAG_ZONE_HEIGHT = 28
 RESIZE_HOTSPOT_SIZE = 16
 CLOSE_BUTTON_SIZE = 24
 CLOSE_BUTTON_MARGIN = 6
+TEXT_RIGHT_MARGIN = CLOSE_BUTTON_SIZE + (CLOSE_BUTTON_MARGIN * 2)
+SELECTION_BG = "#f4c53d"
 
 
 class NoteWindow:
@@ -36,6 +38,7 @@ class NoteWindow:
         )
 
         self.window.bind("<FocusOut>", self._save_geometry)
+        self.window.bind("<FocusIn>", self._on_focus_in)
         self.window.bind("<Configure>", self._on_configure)
 
         self.container = tk.Frame(self.window, bg=NOTE_BG, highlightthickness=0, bd=0)
@@ -45,6 +48,12 @@ class NoteWindow:
         self.container.bind("<ButtonRelease-1>", self._clear_pointer_state)
         self.window.bind("<ButtonRelease-1>", self._clear_pointer_state)
         self.window.bind("<Motion>", self._update_cursor)
+
+        self.body = tk.Frame(self.container, bg=NOTE_BG, bd=0, highlightthickness=0)
+        self.body.place(x=0, y=0, relwidth=1.0, relheight=1.0, width=-TEXT_RIGHT_MARGIN, height=0)
+        self.body.bind("<ButtonPress-1>", self._on_pointer_down)
+        self.body.bind("<B1-Motion>", self._on_pointer_drag)
+        self.body.bind("<ButtonRelease-1>", self._clear_pointer_state)
 
         self.close_button = tk.Button(
             self.container,
@@ -57,16 +66,14 @@ class NoteWindow:
             highlightthickness=0,
             relief="flat",
             font=("Arial", 10, "bold"),
+            cursor="hand2",
+            takefocus=0,
             command=self.hide_note,
         )
         self.close_button.place(width=CLOSE_BUTTON_SIZE, height=CLOSE_BUTTON_SIZE)
+        self.close_button.lift()
 
         font_spec = (manager.settings.font_family, manager.settings.font_size)
-        self.body = tk.Frame(self.container, bg=NOTE_BG, bd=0, highlightthickness=0)
-        self.body.pack(fill="both", expand=True, padx=0, pady=(18, 0))
-        self.body.bind("<ButtonPress-1>", self._on_pointer_down)
-        self.body.bind("<B1-Motion>", self._on_pointer_drag)
-        self.body.bind("<ButtonRelease-1>", self._clear_pointer_state)
         self.text = tk.Text(
             self.body,
             wrap="word",
@@ -79,9 +86,12 @@ class NoteWindow:
             font=font_spec,
             padx=12,
             pady=10,
+            selectbackground=SELECTION_BG,
+            inactiveselectbackground=SELECTION_BG,
+            exportselection=False,
         )
         self.text.pack(fill="both", expand=True)
-        self.text.insert("1.0", note.body)
+        self.text.insert("1.0", editor_body_for_display(note.body))
         self.text.bind("<<Modified>>", self._on_modified)
         self.text.bind("<ButtonPress-1>", self._on_text_pointer_down)
         self.text.bind("<B1-Motion>", self._on_text_pointer_drag)
@@ -102,7 +112,7 @@ class NoteWindow:
         self.manager.unregister(self.note.metadata.note_id)
 
     def flush_note(self) -> None:
-        body = self.text.get("1.0", "end-1c")
+        body = persisted_body_from_editor(self.text.get("1.0", "end-1c"))
         self.note.body = body
         self.note.metadata.title = first_line_title(body)
         x, y, width, height = self._geometry()
@@ -186,6 +196,8 @@ class NoteWindow:
             return "break"
         if self._is_drag_zone(local_x, local_y):
             self._start_drag(event)
+            return "break"
+        self._focus_editor_for_append()
         return None
 
     def _on_pointer_drag(self, event: tk.Event) -> str | None:
@@ -217,8 +229,11 @@ class NoteWindow:
         return None
 
     def _clear_pointer_state(self, _event: tk.Event | None = None) -> None:
+        resized = self._resize_origin is not None
         self._drag_origin = None
         self._resize_origin = None
+        if resized:
+            self._clear_selection()
 
     def _is_drag_zone(self, x: int, y: int) -> bool:
         return y <= DRAG_ZONE_HEIGHT and x < (self.window.winfo_width() - CLOSE_BUTTON_SIZE - (CLOSE_BUTTON_MARGIN * 2))
@@ -240,6 +255,18 @@ class NoteWindow:
         if widget == self.text:
             return "xterm"
         return "arrow"
+
+    def _on_focus_in(self, _event: tk.Event) -> None:
+        self._clear_selection()
+
+    def _focus_editor_for_append(self) -> None:
+        self.text.focus_set()
+        self._clear_selection()
+        self.text.mark_set("insert", "end-1c")
+        self.text.see("insert")
+
+    def _clear_selection(self) -> None:
+        self.text.tag_remove("sel", "1.0", "end")
 
 
 class StickyNotesApp:
@@ -296,3 +323,13 @@ def first_line_title(body: str) -> str:
         if stripped:
             return stripped[:60]
     return "Untitled note"
+
+
+def editor_body_for_display(body: str) -> str:
+    return body + "\n"
+
+
+def persisted_body_from_editor(body: str) -> str:
+    if body.endswith("\n"):
+        return body[:-1]
+    return body
