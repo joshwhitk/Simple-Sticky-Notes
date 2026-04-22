@@ -12,7 +12,7 @@
 - Notes remain usable as desktop objects without Obsidian running.
 - Each note remembers position and size.
 - Font family and font size are adjustable in a settings file; no dedicated UX is required initially.
-- Notes persist to a normal file-backed store in `C:\Users\Josh\Dropbox\backups\josh-obsidian\`, not an opaque app-only database.
+- Notes persist to a normal file-backed store in a standard Windows user folder, not an opaque app-only database.
 - Storage is Obsidian-readable markdown: `.md` note bodies plus sidecar metadata.
 - Multiple notes can stay open simultaneously.
 - Autosave should be reliable and low-friction.
@@ -44,10 +44,7 @@
 * Search local machine or other storage locations for clearer Joplin/Evernote exports if Dropbox remains inconclusive.
 * Add import or adapter design for older plain-text note sources such as Dropbox `locaytanotes` if useful.
 * Evaluate whether Joplin/Evernote interoperability should be import-only, one-way sync, or full read/write.
-* Add a Windows right-click context menu with a flyout list of sticky notes that shows open/hidden state and can unhide/open a selected note with focus.
-* Add right-click menu controls for note color, font size, and font family, using standard Windows pickers where practical.
-* Add right-click actions for `Show Folder`, `Edit in Notepad`, and `Edit in Obsidian`.
-* Add a context-menu action `Split to New Sticky` when text is selected.
+* Evaluate replacing the current menu-based font/color controls with native Windows chooser dialogs if the UX gain is worth the complexity.
 
 ## Completed
 
@@ -76,7 +73,7 @@
 * Removed the default blue selection look from the text widget and clear selection state after resize/focus transitions.
 * Added regression coverage for the editor display-buffer rule so append-style blank-line focus does not leak extra trailing newlines into saved note files.
 * Implemented Windows shortcut installation for a desktop `New Simple Sticky Note` launcher and a startup shortcut for restoring notes after login.
-* Smoke-tested the app launch path and verified note files and metadata are created under `C:\Users\Josh\Dropbox\backups\josh-obsidian\simple-sticky-notes\`.
+* Smoke-tested the app launch path and verified note files and metadata are created under the configured storage root.
 * Verified the updated frameless note window launches cleanly after the chrome-removal changes.
 
 ### Pri2
@@ -84,6 +81,14 @@
 * Confirmed Obsidian-based sticky-note popouts are tied to Obsidian and therefore do not meet the requirement that notes remain on the desktop when Obsidian is not running.
 * Built the Obsidian `sticky-notes` plugin locally because its documented release ZIP path returned `404`.
 * Diagnosed and fixed local unittest discovery so the repo test command works from the project root.
+* Added a right-click note context menu with a flyout list of sticky notes that shows open/hidden state and can unhide/open a selected note with focus.
+* Added right-click controls for note color, font size, and font family using the installed fonts visible to the app.
+* Added right-click actions for `Show Folder`, `Edit in Notepad`, and `Edit in Obsidian`.
+* Added `Split to New Sticky` when text is selected in the note editor.
+* Extended note metadata persistence to store per-note background color.
+* Switched the default storage location to a standard Windows Documents folder.
+* Added a right-click `Set Storage Folder` action that saves a new storage location for use after restart.
+* Changed note body files from opaque ID-based names to long content-based filenames with `-1` style uniqueness suffixes when needed.
 
 ## Deferred
 

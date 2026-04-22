@@ -6,7 +6,7 @@
 
 ## Product Goal
 
-Build a Windows desktop sticky-note companion app that keeps notes visible as standalone desktop objects while storing note bodies as markdown files in a Dropbox-backed, Obsidian-readable folder.
+Build a Windows desktop sticky-note companion app that keeps notes visible as standalone desktop objects while storing note bodies as markdown files in a normal Windows folder that Obsidian can also read.
 
 ## Primary User Requirements
 
@@ -33,7 +33,7 @@ Build a Windows desktop sticky-note companion app that keeps notes visible as st
 ## Storage Requirements
 
 - Base folder:
-  - `C:\Users\Josh\Dropbox\backups\josh-obsidian\simple-sticky-notes\`
+  - `%USERPROFILE%\Documents\Simple Sticky Notes\`
 - Note body format:
   - `.md`
 - Metadata format:

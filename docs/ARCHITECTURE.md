@@ -5,7 +5,7 @@
 Simple Sticky Notes is a standalone Windows desktop app.
 
 - The app owns sticky-note windows and session restore.
-- Note content is stored as markdown files in a Dropbox-backed folder.
+- Note content is stored as markdown files in a standard user-accessible Windows folder.
 - Metadata is stored separately in JSON sidecars.
 - Obsidian is a companion reader/editor for the same note files, not the runtime.
 
@@ -54,7 +54,7 @@ Windows-specific shortcut generation using PowerShell and WScript COM.
 ```text
 simple-sticky-notes/
 |-- notes/
-|   `-- <note-id>.md
+|   `-- <content-based note name>.md
 `-- meta/
     `-- <note-id>.json
 ```
@@ -65,6 +65,7 @@ Current metadata tracks:
 
 - note id
 - title
+- content-based file stem for the markdown body
 - x/y position
 - width/height
 - open/closed state

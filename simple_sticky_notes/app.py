@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import ctypes
 import tkinter as tk
+from pathlib import Path
+from tkinter import filedialog
+from tkinter import font as tkfont
+from tkinter import messagebox
+from typing import Callable
 
 from .models import NoteRecord
-from .settings import load_settings
+from .settings import copy_storage_contents, load_settings, save_settings
 from .storage import StickyStorage
+from .windows_integration import edit_in_notepad, edit_in_obsidian, show_folder
 
 
-NOTE_BG = "#ffd54f"
+DEFAULT_NOTE_BG = "#ffd54f"
 NOTE_TEXT = "#1f2933"
 CORNER_RADIUS = 4
 MIN_WIDTH = 180
@@ -18,7 +24,31 @@ RESIZE_HOTSPOT_SIZE = 16
 CLOSE_BUTTON_SIZE = 24
 CLOSE_BUTTON_MARGIN = 6
 TEXT_RIGHT_MARGIN = CLOSE_BUTTON_SIZE + (CLOSE_BUTTON_MARGIN * 2)
-SELECTION_BG = "#f4c53d"
+
+NOTE_COLORS: dict[str, str] = {
+    "Yellow": "#ffd54f",
+    "Cream": "#fff3bf",
+    "Green": "#c8e6c9",
+    "Blue": "#bbdefb",
+    "Pink": "#f8bbd0",
+    "Orange": "#ffcc80",
+}
+
+FONT_SIZE_OPTIONS = [11, 12, 14, 16, 18, 20, 24, 28]
+COMMON_FONT_FAMILIES = [
+    "Segoe UI",
+    "Aptos",
+    "Calibri",
+    "Arial",
+    "Bahnschrift",
+    "Cambria",
+    "Consolas",
+    "Georgia",
+    "Tahoma",
+    "Times New Roman",
+    "Trebuchet MS",
+    "Verdana",
+]
 
 
 class NoteWindow:
@@ -32,7 +62,6 @@ class NoteWindow:
 
         self.window = tk.Toplevel(manager.root)
         self.window.overrideredirect(True)
-        self.window.configure(bg=NOTE_BG)
         self.window.geometry(
             f"{note.metadata.width}x{note.metadata.height}+{note.metadata.x}+{note.metadata.y}"
         )
@@ -40,29 +69,29 @@ class NoteWindow:
         self.window.bind("<FocusOut>", self._save_geometry)
         self.window.bind("<FocusIn>", self._on_focus_in)
         self.window.bind("<Configure>", self._on_configure)
+        self.window.bind("<ButtonRelease-1>", self._clear_pointer_state)
+        self.window.bind("<Motion>", self._update_cursor)
+        self.window.bind("<Button-3>", self._show_context_menu)
 
-        self.container = tk.Frame(self.window, bg=NOTE_BG, highlightthickness=0, bd=0)
+        self.container = tk.Frame(self.window, highlightthickness=0, bd=0)
         self.container.pack(fill="both", expand=True)
         self.container.bind("<ButtonPress-1>", self._on_pointer_down)
         self.container.bind("<B1-Motion>", self._on_pointer_drag)
         self.container.bind("<ButtonRelease-1>", self._clear_pointer_state)
-        self.window.bind("<ButtonRelease-1>", self._clear_pointer_state)
-        self.window.bind("<Motion>", self._update_cursor)
+        self.container.bind("<Button-3>", self._show_context_menu)
 
-        self.body = tk.Frame(self.container, bg=NOTE_BG, bd=0, highlightthickness=0)
+        self.body = tk.Frame(self.container, bd=0, highlightthickness=0)
         self.body.place(x=0, y=0, relwidth=1.0, relheight=1.0, width=-TEXT_RIGHT_MARGIN, height=0)
         self.body.bind("<ButtonPress-1>", self._on_pointer_down)
         self.body.bind("<B1-Motion>", self._on_pointer_drag)
         self.body.bind("<ButtonRelease-1>", self._clear_pointer_state)
+        self.body.bind("<Button-3>", self._show_context_menu)
 
         self.close_button = tk.Button(
             self.container,
             text="X",
-            bg=NOTE_BG,
             fg=NOTE_TEXT,
             bd=0,
-            activebackground=NOTE_BG,
-            activeforeground=NOTE_TEXT,
             highlightthickness=0,
             relief="flat",
             font=("Arial", 10, "bold"),
@@ -71,23 +100,17 @@ class NoteWindow:
             command=self.hide_note,
         )
         self.close_button.place(width=CLOSE_BUTTON_SIZE, height=CLOSE_BUTTON_SIZE)
-        self.close_button.lift()
 
-        font_spec = (manager.settings.font_family, manager.settings.font_size)
         self.text = tk.Text(
             self.body,
             wrap="word",
             bd=0,
             relief="flat",
             undo=True,
-            bg=NOTE_BG,
             fg=NOTE_TEXT,
             insertbackground=NOTE_TEXT,
-            font=font_spec,
             padx=12,
             pady=10,
-            selectbackground=SELECTION_BG,
-            inactiveselectbackground=SELECTION_BG,
             exportselection=False,
         )
         self.text.pack(fill="both", expand=True)
@@ -97,13 +120,21 @@ class NoteWindow:
         self.text.bind("<B1-Motion>", self._on_text_pointer_drag)
         self.text.bind("<ButtonRelease-1>", self._clear_pointer_state)
         self.text.bind("<Motion>", self._update_cursor)
+        self.text.bind("<Button-3>", self._show_context_menu)
 
+        self.apply_visual_style()
+        self.apply_font_settings()
         self._apply_rounded_corners()
         self._position_controls()
 
     def show(self) -> None:
         self.window.deiconify()
         self.window.lift()
+
+    def focus_for_edit(self) -> None:
+        self.show()
+        self.window.focus_force()
+        self._focus_editor_for_append()
 
     def hide_note(self) -> None:
         self.flush_note()
@@ -122,6 +153,135 @@ class NoteWindow:
         self.note.metadata.height = height
         self.note.metadata.is_open = True
         self.storage.save_note(self.note)
+
+    def apply_visual_style(self) -> None:
+        bg_color = self.note.metadata.bg_color or DEFAULT_NOTE_BG
+        selection_bg = selection_bg_for(bg_color)
+        self.window.configure(bg=bg_color)
+        self.container.configure(bg=bg_color)
+        self.body.configure(bg=bg_color)
+        self.close_button.configure(
+            bg=bg_color,
+            activebackground=bg_color,
+            activeforeground=NOTE_TEXT,
+        )
+        self.text.configure(
+            bg=bg_color,
+            selectbackground=selection_bg,
+            inactiveselectbackground=selection_bg,
+        )
+
+    def apply_font_settings(self) -> None:
+        self.text.configure(font=(self.manager.settings.font_family, self.manager.settings.font_size))
+
+    def set_color(self, color_hex: str) -> None:
+        self.note.metadata.bg_color = color_hex
+        self.apply_visual_style()
+        self.flush_note()
+
+    def split_selection_to_new_sticky(self) -> None:
+        selected_text = self.selected_text()
+        if not selected_text:
+            return
+        self.text.delete("sel.first", "sel.last")
+        self._clear_selection()
+        self.flush_note()
+        self.manager.create_and_open_note(
+            body=selected_text,
+            x=self.window.winfo_x() + 32,
+            y=self.window.winfo_y() + 32,
+            bg_color=self.note.metadata.bg_color,
+        )
+
+    def selected_text(self) -> str:
+        try:
+            return self.text.get("sel.first", "sel.last")
+        except tk.TclError:
+            return ""
+
+    def open_note_in_notepad(self) -> None:
+        self._run_external_action(lambda: edit_in_notepad(self.storage.note_path(self.note.metadata.note_id)))
+
+    def open_note_in_obsidian(self) -> None:
+        self._run_external_action(lambda: edit_in_obsidian(self.storage.note_path(self.note.metadata.note_id)))
+
+    def open_note_folder(self) -> None:
+        self._run_external_action(lambda: show_folder(self.storage.note_path(self.note.metadata.note_id).parent))
+
+    def _run_external_action(self, action: Callable[[], None]) -> None:
+        try:
+            self.flush_note()
+            action()
+        except Exception as exc:
+            messagebox.showerror("Simple Sticky Notes", str(exc), parent=self.window)
+
+    def _show_context_menu(self, event: tk.Event) -> str:
+        self._build_context_menu().tk_popup(event.x_root, event.y_root)
+        return "break"
+
+    def _build_context_menu(self) -> tk.Menu:
+        menu = tk.Menu(self.window, tearoff=0)
+
+        notes_menu = tk.Menu(menu, tearoff=0)
+        all_notes = self.storage.list_notes()
+        if all_notes:
+            for listed_note in all_notes:
+                label = note_menu_label(listed_note)
+                notes_menu.add_command(
+                    label=label,
+                    command=lambda note_id=listed_note.metadata.note_id: self.manager.show_note(note_id),
+                )
+        else:
+            notes_menu.add_command(label="(No notes yet)", state="disabled")
+        menu.add_cascade(label="Notes", menu=notes_menu)
+        menu.add_command(label="New Sticky", command=self.manager.new_note)
+        menu.add_separator()
+
+        color_menu = tk.Menu(menu, tearoff=0)
+        for index, (name, color_hex) in enumerate(NOTE_COLORS.items()):
+            color_menu.add_command(
+                label=name,
+                command=lambda color_hex=color_hex: self.set_color(color_hex),
+            )
+            try:
+                color_menu.entryconfigure(index, background=color_hex, activebackground=color_hex)
+            except tk.TclError:
+                pass
+        menu.add_cascade(label="Color", menu=color_menu)
+
+        font_size_menu = tk.Menu(menu, tearoff=0)
+        for size in FONT_SIZE_OPTIONS:
+            label = f"{size} pt"
+            if size == self.manager.settings.font_size:
+                label = f"* {label}"
+            font_size_menu.add_command(
+                label=label,
+                command=lambda size=size: self.manager.update_font_settings(font_size=size),
+            )
+        menu.add_cascade(label="Font Size", menu=font_size_menu)
+
+        font_family_menu = tk.Menu(menu, tearoff=0)
+        for family in self.manager.available_font_families():
+            label = family
+            if family == self.manager.settings.font_family:
+                label = f"* {label}"
+            font_family_menu.add_command(
+                label=label,
+                command=lambda family=family: self.manager.update_font_settings(font_family=family),
+            )
+        menu.add_cascade(label="Font", menu=font_family_menu)
+
+        menu.add_separator()
+        menu.add_command(label="Show Folder", command=self.open_note_folder)
+        menu.add_command(label="Set Storage Folder", command=lambda: self.manager.choose_storage_folder(self.window))
+        menu.add_command(label="Edit in Notepad", command=self.open_note_in_notepad)
+        menu.add_command(label="Edit in Obsidian", command=self.open_note_in_obsidian)
+
+        if self.selected_text():
+            menu.add_separator()
+            menu.add_command(label="Split to New Sticky", command=self.split_selection_to_new_sticky)
+
+        return menu
 
     def _on_modified(self, _event: object) -> None:
         self.text.edit_modified(False)
@@ -293,14 +453,94 @@ class StickyNotesApp:
         return 0
 
     def new_note(self) -> None:
-        self.open_note(self.storage.create_note())
+        self.create_and_open_note()
+
+    def create_and_open_note(
+        self,
+        *,
+        body: str = "",
+        x: int = 80,
+        y: int = 80,
+        bg_color: str = DEFAULT_NOTE_BG,
+    ) -> None:
+        title = first_line_title(body)
+        note = self.storage.create_note(
+            title=title,
+            body=body,
+            x=x,
+            y=y,
+            bg_color=bg_color,
+        )
+        self.open_note(note)
 
     def open_note(self, note: NoteRecord) -> None:
+        existing = self.windows.get(note.metadata.note_id)
+        if existing:
+            existing.focus_for_edit()
+            return
+
         note.metadata.is_open = True
         self.storage.save_note(note)
         window = NoteWindow(self, note)
         self.windows[note.metadata.note_id] = window
-        window.show()
+        window.focus_for_edit()
+
+    def show_note(self, note_id: str) -> None:
+        existing = self.windows.get(note_id)
+        if existing:
+            existing.focus_for_edit()
+            return
+
+        stored_note = self.storage.load_note(note_id)
+        if not stored_note.metadata.is_open:
+            stored_note = self.storage.reopen_note(note_id)
+        self.open_note(stored_note)
+
+    def update_font_settings(self, *, font_family: str | None = None, font_size: int | None = None) -> None:
+        if font_family:
+            self.settings.font_family = font_family
+        if font_size:
+            self.settings.font_size = font_size
+        save_settings(self.settings)
+        for window in self.windows.values():
+            window.apply_font_settings()
+            window.flush_note()
+
+    def available_font_families(self) -> list[str]:
+        installed = set(tkfont.families(self.root))
+        chosen: list[str] = []
+        for family in [self.settings.font_family, *COMMON_FONT_FAMILIES]:
+            if family in installed and family not in chosen:
+                chosen.append(family)
+        return chosen or [self.settings.font_family]
+
+    def choose_storage_folder(self, parent: tk.Misc | None = None) -> None:
+        chosen = filedialog.askdirectory(
+            parent=parent,
+            title="Choose storage folder",
+            initialdir=self.settings.storage_root,
+            mustexist=False,
+        )
+        if not chosen:
+            return
+        self.prepare_storage_folder_change(Path(chosen), parent=parent)
+
+    def prepare_storage_folder_change(self, new_root: Path, parent: tk.Misc | None = None) -> None:
+        old_root = Path(self.settings.storage_root)
+        if str(new_root) == str(old_root):
+            return
+
+        for window in list(self.windows.values()):
+            window.flush_note()
+
+        copy_storage_contents(old_root, new_root)
+        self.settings.storage_root = str(new_root)
+        save_settings(self.settings)
+        messagebox.showinfo(
+            "Simple Sticky Notes",
+            "Storage folder saved. Restart Simple Sticky Notes to begin using the new location.",
+            parent=parent,
+        )
 
     def unregister(self, note_id: str) -> None:
         self.windows.pop(note_id, None)
@@ -333,3 +573,21 @@ def persisted_body_from_editor(body: str) -> str:
     if body.endswith("\n"):
         return body[:-1]
     return body
+
+
+def selection_bg_for(bg_color: str) -> str:
+    red = int(bg_color[1:3], 16)
+    green = int(bg_color[3:5], 16)
+    blue = int(bg_color[5:7], 16)
+    darkened = (
+        max(0, int(red * 0.88)),
+        max(0, int(green * 0.88)),
+        max(0, int(blue * 0.88)),
+    )
+    return f"#{darkened[0]:02x}{darkened[1]:02x}{darkened[2]:02x}"
+
+
+def note_menu_label(note: NoteRecord) -> str:
+    state = "open" if note.metadata.is_open else "hidden"
+    title = note.metadata.title.strip() or f"Note {note.metadata.note_id[:6]}"
+    return f"[{state}] {title}"

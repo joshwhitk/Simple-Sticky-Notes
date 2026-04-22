@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 
 def project_root() -> Path:
@@ -51,3 +53,15 @@ def install_windows_shortcuts() -> dict[str, str]:
     create_shortcut(shortcuts["desktop_new"], target, f'"{entry}" --new-note', icon)
     create_shortcut(shortcuts["startup_app"], target, f'"{entry}"', icon)
     return {name: str(path) for name, path in shortcuts.items()}
+
+
+def show_folder(path: Path) -> None:
+    subprocess.Popen(["explorer.exe", str(path)])
+
+
+def edit_in_notepad(path: Path) -> None:
+    subprocess.Popen(["notepad.exe", str(path)])
+
+
+def edit_in_obsidian(path: Path) -> None:
+    os.startfile(f"obsidian://open?path={quote(str(path))}")

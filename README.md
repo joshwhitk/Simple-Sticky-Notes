@@ -1,6 +1,6 @@
 # Simple Sticky Notes
 
-Simple Sticky Notes is a Windows desktop sticky-note companion app that stores note bodies as markdown files in a Dropbox-backed, Obsidian-readable folder.
+Simple Sticky Notes is a Windows desktop sticky-note companion app that stores note bodies as markdown files in a normal Windows folder, with markdown files that Obsidian can read directly.
 
 The app is intentionally **not** built on top of Obsidian as the runtime. Obsidian remains a useful companion for editing, searching, and browsing the same markdown files, but the sticky-note windows themselves are owned by a standalone Windows app so they can remain visible and restorable independent of Obsidian.
 
@@ -20,10 +20,12 @@ The app is intentionally **not** built on top of Obsidian as the runtime. Obsidi
 This repo is in active prototyping. The first implementation slice includes:
 
 - Python/Tkinter app scaffold
-- Markdown file storage in Dropbox
+- Markdown file storage in Documents by default
 - Sidecar metadata for note geometry and open/closed state
+- Content-based markdown filenames with uniqueness suffixes when needed
 - Frameless note window shell with custom close button
 - Windows desktop/startup shortcut installer
+- Right-click note menu for note switching, colors, fonts, and storage-folder changes
 - Initial storage tests
 - Windows icon assets for the app
 
@@ -65,14 +67,14 @@ python -m unittest discover -s tests -p "test_*.py" -v
 
 By default note data is stored under:
 
-`C:\Users\Josh\Dropbox\backups\josh-obsidian\simple-sticky-notes\`
+`%USERPROFILE%\Documents\Simple Sticky Notes\`
 
 The storage layout is:
 
-- `notes/<note-id>.md` for note bodies
+- `notes/<content-based note name>.md` for note bodies
 - `meta/<note-id>.json` for window state and session metadata
 
-This allows Obsidian to read the note bodies directly while the desktop app manages position, size, and runtime state separately.
+This allows Obsidian to read the note bodies directly while the desktop app manages position, size, and runtime state separately. If two notes would produce the same body filename, the app adds `-1`, `-2`, and so on.
 
 ## Repo Layout
 

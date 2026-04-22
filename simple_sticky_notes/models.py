@@ -29,6 +29,8 @@ class NoteMetadata:
     is_open: bool
     created_at: str
     updated_at: str
+    bg_color: str = "#ffd54f"
+    file_stem: str = ""
 
 
 @dataclass(slots=True)
