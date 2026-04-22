@@ -25,20 +25,19 @@
 ### Pri1
 
 - Adapt or build a Windows companion sticky-note app as an alternative to using Obsidian as the runtime.
-* Choose the best baseline implementation to adapt, currently leaning toward `Textylic` because it already has frameless desktop-widget behavior and source is available.
 - Define the storage model for `.md` note content and note window metadata.
-- Create Windows icon assets for `Simple Sticky Notes` for taskbar, desktop, and executable use.
+- Harden the first working app slice: frameless note window behavior, autosave, and session persistence.
+- Improve note lifecycle semantics so hidden notes stay hidden while open notes restore cleanly after login.
+- Keep the repo presentable in the usual GitHub way as implementation work lands.
 
 ## Planned
 
 ### Pri1
 
-* Clone the chosen baseline companion app into this workspace.
-* Replace app-specific storage with folder-backed `.md` note files plus sidecar metadata for position, size, font, and restore state.
-* Implement startup/session restore so notes reopen after reboot/login.
-* Add a fast desktop shortcut path for `New Sticky Note`.
-* Verify the app can run independently of Obsidian while still using an Obsidian-readable storage folder.
+* Improve note state handling after abnormal shutdowns or forced termination.
+* Expand tests beyond storage into more session and integration behaviors.
 * Design an optional Obsidian control panel plugin or settings view for managing the companion app.
+* Decide whether to adapt any external baseline further or continue with the current clean implementation.
 
 ### Pri2
 
@@ -53,6 +52,7 @@
 * Initialized this workspace as a git repository.
 * Connected this workspace to `https://github.com/joshwhitk/Simple-Sticky-Notes.git`.
 * Created and pushed the initial local git history to the GitHub repo.
+* Added a GitHub-friendly repo shape with `README.md`, `docs/`, `CONTRIBUTING.md`, and issue templates.
 * Installed Obsidian `1.12.7` on this PC.
 * Removed the local `lokus` checkout from this workspace.
 * Created and configured a test Obsidian vault with the `sticky-notes` plugin.
@@ -61,11 +61,18 @@
 * Determined there is no strong off-the-shelf GitHub project that already satisfies both the required desktop-window behavior and file-backed note interoperability.
 * Identified `Textylic` as the strongest source-available UI/runtime baseline found so far.
 * Searched Dropbox for likely Evernote and Joplin backup names and found no clear `.enex`, `.jex`, or Joplin profile backup under obvious names.
+* Generated Windows icon assets for `Simple Sticky Notes` from the provided transparent PNG source.
+* Implemented the first standalone app slice in Python/Tkinter with markdown body storage, JSON sidecar metadata, frameless note windows, and a custom close button.
+* Removed the visible note title and visible resize-grip icon so the note looks more like a literal sticky note.
+* Added rounded window corners and an invisible resize zone in place of the default corner grab UI.
+* Implemented Windows shortcut installation for a desktop `New Simple Sticky Note` launcher and a startup shortcut for restoring notes after login.
+* Smoke-tested the app launch path and verified note files and metadata are created under `C:\Users\Josh\Dropbox\backups\josh-obsidian\simple-sticky-notes\`.
 
 ### Pri2
 
 * Confirmed Obsidian-based sticky-note popouts are tied to Obsidian and therefore do not meet the requirement that notes remain on the desktop when Obsidian is not running.
 * Built the Obsidian `sticky-notes` plugin locally because its documented release ZIP path returned `404`.
+* Diagnosed and fixed local unittest discovery so the repo test command works from the project root.
 
 ## Deferred
 
