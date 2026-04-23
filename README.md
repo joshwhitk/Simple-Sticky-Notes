@@ -1,11 +1,11 @@
+
+![Store box back](docs/screenshots/store-box-back.png)
+
 # Simple Sticky Notes
 
 Simple Sticky Notes is a Windows desktop sticky-note companion app that stores note bodies as markdown files in the active Obsidian vault when one is available, with markdown files that Obsidian can read directly.
 
 The app is intentionally **not** built on top of Obsidian as the runtime. Obsidian remains a useful companion for editing, searching, and browsing the same markdown files, but the sticky-note windows themselves are owned by a standalone Windows app so they can remain visible and restorable independent of Obsidian.
-
-### Store Box 
-![Store box back](docs/screenshots/store-box-back.png)
 
 ## Goals
 
