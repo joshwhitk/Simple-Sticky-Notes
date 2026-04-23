@@ -54,10 +54,6 @@ This repo is in active prototyping. The current implementation includes:
 
 ![Color menu](docs/screenshots/color-menu.png)
 
-### Store Box 
-
-![Store box back](docs/screenshots/store-box-back.png)
-
 ## Project Docs
 
 - [MRD](docs/MRD.md)
