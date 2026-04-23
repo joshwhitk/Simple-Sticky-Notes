@@ -6,7 +6,7 @@ import pystray
 from PIL import Image
 
 from .models import NoteRecord
-from .windows_integration import project_root
+from .windows_integration import resource_root
 
 if TYPE_CHECKING:
     from .app import StickyNotesApp
@@ -41,7 +41,7 @@ class TrayController:
         self.icon.update_menu()
 
     def _load_icon_image(self) -> Image.Image:
-        icon_path = project_root() / "assets" / "icons" / "simple-sticky-notes-64.png"
+        icon_path = resource_root() / "assets" / "icons" / "simple-sticky-notes-64.png"
         with Image.open(icon_path) as image:
             return image.copy()
 

@@ -22,6 +22,10 @@ def shortcut_icon_path() -> Path:
 
 
 def resource_root() -> Path:
+    if running_frozen():
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            return Path(meipass).resolve()
     return Path(__file__).resolve().parent.parent
 
 

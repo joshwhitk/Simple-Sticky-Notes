@@ -8,6 +8,14 @@ from simple_sticky_notes import windows_integration
 
 
 class WindowsIntegrationTests(unittest.TestCase):
+    def test_resource_root_uses_meipass_in_frozen_mode(self) -> None:
+        with mock.patch.object(windows_integration, "running_frozen", return_value=True), mock.patch.object(
+            windows_integration.sys, "_MEIPASS", r"C:\Users\Josh\AppData\Local\Temp\_MEI12345", create=True
+        ):
+            root = windows_integration.resource_root()
+
+        self.assertEqual(root, Path(r"C:\Users\Josh\AppData\Local\Temp\_MEI12345"))
+
     def test_shortcut_icon_path_uses_repo_icon_in_source_mode(self) -> None:
         with mock.patch.object(windows_integration, "running_frozen", return_value=False), mock.patch.object(
             windows_integration, "resource_root", return_value=Path(r"C:\repo\SimpleStickyNotes")

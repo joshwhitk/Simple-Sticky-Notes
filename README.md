@@ -128,7 +128,7 @@ Obsidian pop-out windows are tied to Obsidian itself. That fails a key requireme
 
 ## Compared With Microsoft Sticky Notes
 
-If you want to support development, you can also buy `Simple Sticky Notes` on the Microsoft Store once the listing is live.
+`Simple Sticky Notes` for the Microsoft Store is coming soon.
 
 Microsoft Sticky Notes does cover some adjacent use cases well. According to Microsoft Support, it:
 

@@ -11,15 +11,23 @@
 
 ## Results
 
-- On `2026-04-23`, `python -m unittest -v` passed `30` tests after the Obsidian filename fix and packaged shortcut icon fix landed.
+- On `2026-04-23`, `python -m unittest -v` passed `32` tests after the packaged tray/resource-root fix landed.
+- On `2026-04-23`, `powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1` succeeded from the normal repo workspace after Dropbox was quit, producing a fresh `1.0.3` installer at `dist\installer\Simple-Sticky-Notes-Setup.exe`.
+- On `2026-04-23`, the locally installed app under `%LOCALAPPDATA%\Programs\Simple Sticky Notes` was inspected after the `assets\icons\simple-sticky-notes-64.png` crash, silently reinstalled from the freshly built `1.0.3` installer, and then re-verified by launching `New Simple Sticky Note.lnk`. The installed `Simple Sticky Notes.exe --new-note` process stayed alive, confirming the packaged resource-path fix works in practice on this PC.
 - On `2026-04-23`, a staged `1.0.2` packaged EXE smoke check passed with `packaged_exe_alive_after_2s=True`.
 - On `2026-04-23`, `installer\build.ps1` was blocked by a lock on the Dropbox `dist\` directory, so the same PyInstaller and Inno Setup steps were rerun successfully against clean staging paths to produce the `1.0.2` installer artifact. This was an environment workaround, not a code fix.
 - On `2026-04-23`, `v1.0.2` was published to GitHub and mirrored to `https://app.whitkin.com/downloads/Simple-Sticky-Notes-Setup.exe`. No additional automated tests were run for that release-management step.
+- On `2026-04-23`, local Dropbox ignore rules were added at the Dropbox root to stop future build-output folders for this repo from syncing. No automated tests were run for that machine-specific sync configuration change.
+- On `2026-04-23`, the local Dropbox ignore rules were refined so this repo keeps syncing source plus final binaries while excluding local scratch folders, and the desktop `.lnk` was re-launched successfully to confirm the shortcut itself now works. No automated tests were run for that machine-specific sync/shortcut verification step.
+- On `2026-04-23`, the installed `%LOCALAPPDATA%\\Programs\\Simple Sticky Notes` payload was inspected after the desktop launch still failed and was found to be missing `base_library.zip` in `_internal`. Reinstalling `v1.0.2` restored the runtime files, and relaunching the desktop `.lnk` produced a live `Simple Sticky Notes.exe --new-note` process. No automated tests were run for that machine-specific install repair.
 - On `2026-04-23`, Microsoft Store pricing guidance for switching the listing to a paid tier was documented from current Microsoft docs. No automated tests were run for that release-management guidance.
+- On `2026-04-23`, the README wording for Microsoft Store availability was corrected to `coming soon` after the first MSIX packaging attempt failed locally. No automated tests were run for that docs-only change.
 - On `2026-04-23`, the first Microsoft Store submission was created in Partner Center and entered review under ID `78b96f9d-3b84-447d-93c2-50fe1a3e52a6`. No automated tests were run for that release-management update.
 - On `2026-04-23`, the installed desktop and startup shortcuts on this PC were manually inspected after a `failed to import encoding module` launch error. The diagnosis confirmed stale packaged shortcut arguments pointing at `_internal\main.py`, and the live `.lnk` files were recreated to launch the installed EXE directly. No automated tests were run for that machine-specific shortcut repair.
 - On `2026-04-23`, `python -m unittest tests.test_storage tests.test_app -v` passed `18` targeted tests while diagnosing and fixing the Obsidian title/focus regression.
 - Coverage now includes:
+  - frozen-mode packaged resource lookup through PyInstaller's runtime resource root
+  - tray icon loading from the packaged `assets\icons\simple-sticky-notes-64.png` path
   - packaged shortcut icon selection using the repo `.ico` in source mode and the installed EXE in frozen mode
 - On `2026-04-22`, the README comparison against Microsoft Sticky Notes was refreshed from current Microsoft Support documentation. No code changes or automated tests were needed for that docs-only update.
 - On `2026-04-22`, Microsoft Store submission docs were added for the current `EXE/MSI` Partner Center flow. No automated tests were run for that docs-only planning work.

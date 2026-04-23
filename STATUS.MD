@@ -31,6 +31,8 @@
 - Apply a native Windows drop shadow to frameless note windows if the OS window manager will honor it.
 - Validate the packaged installer end-to-end on this PC, including the detected-vault storage prompt and installed shortcut behavior.
 - Verify the updated stable-filename Obsidian flow manually on this PC so editing in Obsidian no longer steals focus into another note.
+- Repackage the app for Microsoft Store submission as `MSIX` after the `EXE` submission path was rejected for missing code signing.
+- Recover the Microsoft Store release path after the first `MSIX` packaging attempt failed locally; keep public messaging at `coming soon` until Store packaging is actually working.
 - Keep the repo and docs aligned with the app as implementation and validation land.
 
 ## Planned
@@ -97,10 +99,19 @@
 - Created the Microsoft Partner Center product and submitted the first Store listing for review under Partner Center ID `78b96f9d-3b84-447d-93c2-50fe1a3e52a6`.
 - Confirmed the Store submission was accepted with a directly hosted installer URL and is now in the review queue with an estimated review time of about three days.
 - Captured the current Microsoft guidance for switching the Store listing to paid pricing: pricing is changed from the `Pricing and availability` page through a submission update, and package uploads are not required when only metadata such as price changes.
+- Confirmed the first Microsoft Store `EXE` submission path is blocked by signing requirements, and the next Store submission should pivot to `MSIX`, which Microsoft documents as the recommended format with free Microsoft code signing and CDN hosting.
+- Updated the public README so Microsoft Store availability is described as `coming soon` instead of implying the app is already purchasable there.
 - Diagnosed the desktop shortcut `failed to import encoding module` error as a stale installed shortcut definition still passing `_internal\\main.py` to the packaged EXE; repaired the existing desktop and startup `.lnk` files in place so they now launch the installed EXE directly with supported arguments only.
 - Diagnosed the wrong desktop shortcut icon as a packaged-path bug: installed shortcuts were pointing at a non-existent `_internal\\assets\\icons\\simple-sticky-notes.ico` file. Fix applied in source: packaged shortcuts now use the installed EXE itself as the icon source.
 - Built the `1.0.2` packaged app and installer from clean staging output after the stock `installer\\build.ps1` path was blocked by a live lock on the Dropbox `dist\\` directory; the staged packaged EXE passed a 2-second liveness smoke check.
 - Published `v1.0.2` to GitHub, including the patched installer asset, and mirrored the same installer to the direct download URL used for Store-friendly hosting.
+- Added local Dropbox ignore rules at the Dropbox root so future `build`, `dist`, `build_stage_*`, and `dist_stage_*` folders under this repo do not sync by default on this machine.
+- Refined the local Dropbox ignore rules so this repo keeps syncing source plus final shipped binaries, while excluding local build scratch folders, `for-ms-store`, `obsidian-test-vault`, and the separate `Muesli\\muesli\\.tmp` temp area shown in Dropbox warnings.
+- Re-verified the repaired desktop shortcut by launching the `.lnk` itself and confirming it starts another `Simple Sticky Notes.exe` process with the packaged `--new-note` path.
+- Diagnosed the remaining desktop launch failure as a corrupted installed app payload, not a shortcut problem: the installed `_internal` folder was missing `base_library.zip`, which prevented the packaged interpreter from importing `encodings`. Reinstalling `v1.0.2` restored the runtime files, and the desktop `.lnk` now launches successfully.
+- Diagnosed the next installed desktop-launch failure as a packaged resource-path bug: the tray/icon loader still looked for `assets\\icons\\simple-sticky-notes-64.png` beside the installed EXE, but packaged assets live under PyInstaller's `_internal` resource root. Fix applied: packaged resource lookup now uses `sys._MEIPASS` via `resource_root()` for tray/icon assets.
+- Added regression coverage for frozen-mode resource lookup and tray icon loading from the packaged resource root.
+- Rebuilt the installer as `1.0.3`, reinstalled it silently over the local install, and verified the actual desktop `New Simple Sticky Note.lnk` now launches the installed EXE successfully with `--new-note`.
 
 ### Pri2
 
