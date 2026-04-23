@@ -33,6 +33,32 @@ This repo is in active prototyping. The current implementation includes:
 - Automated tests for storage, menu behavior, runtime recovery, and Obsidian integration
 - Windows icon assets for the app
 
+## Screenshots
+
+### Desktop Notes
+
+![Desktop notes](docs/screenshots/desktop-notes.png)
+
+### Note Context Menu
+
+![Note context menu](docs/screenshots/note-context-menu.png)
+
+### Tray Menu
+
+![Tray menu](docs/screenshots/tray-menu.png)
+
+### Color Menu
+
+![Color menu](docs/screenshots/color-menu.png)
+
+### Store Box Front
+
+![Store box front](docs/screenshots/store-box-front.png)
+
+### Store Box Back
+
+![Store box back](docs/screenshots/store-box-back.png)
+
 ## Project Docs
 
 - [MRD](docs/MRD.md)
