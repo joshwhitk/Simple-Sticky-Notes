@@ -10,7 +10,14 @@ except ImportError:  # PyYAML is a test-only convenience, not a runtime dependen
     yaml = None
 
 from simple_sticky_notes.models import AppSettings
-from simple_sticky_notes.app import editor_body_for_display, note_menu_label, persisted_body_from_editor, selection_bg_for
+from simple_sticky_notes.app import (
+    editor_body_for_display,
+    join_image_runs,
+    note_menu_label,
+    persisted_body_from_editor,
+    selection_bg_for,
+    split_body_for_images,
+)
 from simple_sticky_notes.storage import (
     StickyStorage,
     format_note_with_frontmatter,
@@ -263,6 +270,41 @@ class StickyStorageTests(unittest.TestCase):
         raw = self.storage.note_path(note.metadata.note_id).read_text(encoding="utf-8")
         self.assertEqual(raw.count("stickynote"), 1)
         self.assertEqual(self.storage.load_note(note.metadata.note_id).body, "hello\nworld")
+
+
+class InlineImageRunTests(unittest.TestCase):
+    """Pure round-trip core for rendering image embeds inline in the editor."""
+
+    @staticmethod
+    def _is_image(name: str) -> bool:
+        return name.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp"))
+
+    def test_only_image_embeds_become_image_runs(self) -> None:
+        body = "see ![[Pasted image 1.png]] and link ![[some note]] done"
+        runs = split_body_for_images(body, self._is_image)
+        self.assertEqual(
+            runs,
+            [
+                ("text", "see "),
+                ("image", "Pasted image 1.png"),
+                ("text", " and link ![[some note]] done"),
+            ],
+        )
+
+    def test_join_is_inverse_of_split(self) -> None:
+        for body in [
+            "plain text only",
+            "![[a.png]]",
+            "lead\n![[a.png]]\n![[b.jpg]]\ntrail",
+            "no images but ![[a wikilink]] stays text",
+            "",
+        ]:
+            self.assertEqual(join_image_runs(split_body_for_images(body, self._is_image)), body)
+
+    def test_image_at_start_and_adjacent_images(self) -> None:
+        body = "![[a.png]]![[b.png]]x"
+        runs = split_body_for_images(body, self._is_image)
+        self.assertEqual(runs, [("image", "a.png"), ("image", "b.png"), ("text", "x")])
 
 
 if __name__ == "__main__":

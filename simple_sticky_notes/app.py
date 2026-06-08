@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import json
 import math
+import re
 import tkinter as tk
 from pathlib import Path
 from queue import Empty, Queue
@@ -134,7 +135,9 @@ class NoteWindow:
             exportselection=False,
         )
         self.text.pack(fill="both", expand=True)
-        self.text.insert("1.0", editor_body_for_display(note.body))
+        self._inline_images: dict[str, str] = {}  # Tk embed name -> markdown filename
+        self._image_refs: list[object] = []        # keep PhotoImage refs alive
+        self._render_body_into_text(note.body)
         self.text.bind("<<Modified>>", self._on_modified)
         self.text.bind("<<Paste>>", self._on_paste)
         self.text.bind("<ButtonPress-1>", self._on_text_pointer_down)
@@ -181,7 +184,7 @@ class NoteWindow:
             except tk.TclError:
                 pass
             self._autosave_job = None
-        body = persisted_body_from_editor(self.text.get("1.0", "end-1c"))
+        body = self._serialize_text_to_body()
         self.note.body = body
         self.note.metadata.title = note_title(body)
         x, y, width, height = self._geometry()
@@ -263,9 +266,78 @@ class NoteWindow:
             self.text.delete("sel.first", "sel.last")
         except tk.TclError:
             pass
-        self.text.insert("insert", "".join(f"![[{name}]]\n" for name in names))
+        for name in names:
+            if not self._insert_inline_image(name, "insert"):
+                self.text.insert("insert", f"![[{name}]]")
+            self.text.insert("insert", "\n")
         self.flush_note()
         return "break"
+
+    def _image_embed_path(self, name: str) -> Path | None:
+        """Resolve an ``![[name]]`` embed to an image file, or None if not an image.
+
+        Prefers the vault's _attachments folder (where this app saves pasted
+        images), then the vault root, then a vault-wide basename search."""
+        if not name.lower().endswith(INLINE_IMAGE_EXTS):
+            return None
+        candidate = self.storage.attachments_dir() / name
+        if candidate.exists():
+            return candidate
+        candidate = self.storage.root / name
+        if candidate.exists():
+            return candidate
+        for found in self.storage.root.rglob(name):
+            if found.is_file():
+                return found
+        return None
+
+    def _insert_inline_image(self, md_name: str, index: str = "insert") -> bool:
+        """Load an image embed and place it inline in the editor. Returns False if
+        the embed can't be resolved/loaded (caller then keeps the literal text)."""
+        path = self._image_embed_path(md_name)
+        if path is None:
+            return False
+        try:
+            from PIL import Image, ImageTk
+
+            image = Image.open(path)
+            image.thumbnail((MAX_INLINE_IMAGE_W, MAX_INLINE_IMAGE_H))
+            photo = ImageTk.PhotoImage(image)
+        except Exception:
+            return False
+        embed_name = self.text.image_create(index, image=photo, padx=2, pady=2)
+        self._image_refs.append(photo)
+        self._inline_images[embed_name] = md_name
+        return True
+
+    def _render_body_into_text(self, body: str) -> None:
+        """Replace the editor contents with `body`, rendering image embeds inline.
+        Mirrors editor_body_for_display by appending one trailing blank line."""
+        self.text.delete("1.0", "end")
+        self._inline_images.clear()
+        self._image_refs.clear()
+        self.text.mark_set("insert", "1.0")
+        for kind, value in split_body_for_images(body, lambda n: self._image_embed_path(n) is not None):
+            if kind == "text":
+                if value:
+                    self.text.insert("insert", value)
+            elif not self._insert_inline_image(value, "insert"):
+                self.text.insert("insert", f"![[{value}]]")
+        self.text.insert("insert", "\n")
+        self.text.edit_modified(False)
+
+    def _serialize_text_to_body(self) -> str:
+        """Inverse of _render_body_into_text: dump the editor (text + inline images)
+        back to markdown, turning each embedded image into its ``![[name]]`` token."""
+        parts: list[str] = []
+        for key, value, _index in self.text.dump("1.0", "end-1c", text=True, image=True):
+            if key == "text":
+                parts.append(value)
+            elif key == "image":
+                md_name = self._inline_images.get(value)
+                if md_name:
+                    parts.append(f"![[{md_name}]]")
+        return persisted_body_from_editor("".join(parts))
 
     @staticmethod
     def _clipboard_images() -> tuple[object | None, list[Path]]:
@@ -561,9 +633,7 @@ class NoteWindow:
         self.note.metadata.title = note_title(disk_body)
         self.storage.save_note(self.note)
         self._last_disk_signature = self._current_disk_signature()
-        self.text.delete("1.0", "end")
-        self.text.insert("1.0", editor_body_for_display(disk_body))
-        self.text.edit_modified(False)
+        self._render_body_into_text(disk_body)
         self._place_insert_at_append()
 
     def _current_disk_signature(self) -> tuple[str, int, int] | None:
@@ -933,6 +1003,39 @@ def persisted_body_from_editor(body: str) -> str:
     if body.endswith("\n"):
         return body[:-1]
     return body
+
+
+INLINE_IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
+EMBED_RE = re.compile(r"!\[\[([^\]\n]+?)\]\]")
+MAX_INLINE_IMAGE_W = 260
+MAX_INLINE_IMAGE_H = 260
+
+
+def split_body_for_images(body: str, is_image: Callable[[str], bool]) -> list[tuple[str, str]]:
+    """Split a note body into ('text', s) and ('image', name) runs.
+
+    Only ``![[name]]`` embeds for which ``is_image(name)`` returns True become
+    'image' runs; every other embed and span stays in the surrounding 'text' run,
+    so non-image wikilinks are preserved verbatim. This is the pure, Tk-free core
+    of inline-image rendering and is the inverse of ``join_image_runs``."""
+    runs: list[tuple[str, str]] = []
+    pos = 0
+    for match in EMBED_RE.finditer(body):
+        name = match.group(1).strip()
+        if not is_image(name):
+            continue
+        if match.start() > pos:
+            runs.append(("text", body[pos:match.start()]))
+        runs.append(("image", name))
+        pos = match.end()
+    if pos < len(body):
+        runs.append(("text", body[pos:]))
+    return runs
+
+
+def join_image_runs(runs: list[tuple[str, str]]) -> str:
+    """Reassemble runs from ``split_body_for_images`` back into a markdown body."""
+    return "".join(value if kind == "text" else f"![[{value}]]" for kind, value in runs)
 
 
 def selection_bg_for(bg_color: str) -> str:
