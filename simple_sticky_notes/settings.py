@@ -6,7 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .models import AppSettings
-from .obsidian_integration import recommended_storage_root
+from .obsidian_integration import VAULT_STORAGE_FOLDER, recommended_storage_root
 
 
 APP_DATA_DIR = Path.home() / "AppData" / "Roaming" / "SimpleStickyNotes"
@@ -37,7 +37,8 @@ def load_settings() -> AppSettings:
     data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
     settings = AppSettings(**data)
     settings = migrate_legacy_storage_root(settings)
-    return migrate_default_documents_storage_to_obsidian(settings)
+    settings = migrate_default_documents_storage_to_obsidian(settings)
+    return migrate_obsidian_vault_storage_root(settings)
 
 
 def save_settings(settings: AppSettings) -> None:
@@ -94,5 +95,19 @@ def migrate_default_documents_storage_to_obsidian(settings: AppSettings) -> AppS
 
     copy_storage_contents(Path(settings.storage_root), DEFAULT_STORAGE_ROOT)
     settings.storage_root = str(DEFAULT_STORAGE_ROOT)
+    save_settings(settings)
+    return settings
+
+
+def migrate_obsidian_vault_storage_root(settings: AppSettings) -> AppSettings:
+    current_root = Path(settings.storage_root)
+    target_root = DEFAULT_STORAGE_ROOT
+    if normalized_path(current_root) == normalized_path(target_root):
+        return settings
+    if current_root.name != VAULT_STORAGE_FOLDER or target_root.name != VAULT_STORAGE_FOLDER:
+        return settings
+
+    copy_storage_contents(current_root, target_root)
+    settings.storage_root = str(target_root)
     save_settings(settings)
     return settings

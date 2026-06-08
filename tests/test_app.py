@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -97,6 +98,14 @@ class AppBehaviorTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(self.app.storage.list_notes(), [])
 
+    def test_run_with_initial_note_bodies_creates_notes(self) -> None:
+        self.app.root.after(50, self.app.shutdown)
+
+        result = self.app.run(initial_note_bodies=["one", "two"])
+
+        self.assertEqual(result, 0)
+        self.assertEqual(len(self.app.storage.list_notes()), 2)
+
     def test_external_obsidian_edit_reloads_body_without_renaming_markdown_file(self) -> None:
         self.app.create_and_open_note(body="one two three four five six seven eight nine ten eleven")
         window = next(iter(self.app.windows.values()))
@@ -109,7 +118,86 @@ class AppBehaviorTests(unittest.TestCase):
 
         self.assertEqual(self.app.storage.note_path(note_id), note_path)
         self.assertEqual(window.note.metadata.title, "updated from obsidian with more words than before")
-        self.assertEqual(note_path.read_text(encoding="utf-8"), "updated from obsidian with more words than before")
+        # After reload and resave, the file now has frontmatter with the title and stickynote tag
+        reloaded = self.app.storage.load_note(note_id)
+        self.assertEqual(reloaded.body, "updated from obsidian with more words than before")
+
+    def test_external_sync_does_not_double_frontmatter_or_corrupt_title(self) -> None:
+        # Regression: an open note whose backing file already carries frontmatter
+        # (the normal state after any save) must not gain a second frontmatter block
+        # nor have its title rewritten to "---" each time the file is touched.
+        self.app.create_and_open_note(body="first line stays the title")
+        window = next(iter(self.app.windows.values()))
+        note_id = window.note.metadata.note_id
+        note_path = self.app.storage.note_path(note_id)
+
+        # The on-disk file has exactly one frontmatter block after creation.
+        self.assertEqual(note_path.read_text(encoding="utf-8").count("stickynote"), 1)
+
+        # Simulate an external editor touching the file (rewriting it with frontmatter,
+        # as our own saves do) and the open window syncing from disk.
+        from simple_sticky_notes.storage import format_note_with_frontmatter
+
+        note_path.write_text(
+            format_note_with_frontmatter("edited body keeps a single block"),
+            encoding="utf-8",
+        )
+        window._refresh_from_disk_if_needed()
+
+        raw = note_path.read_text(encoding="utf-8")
+        self.assertEqual(raw.count("stickynote"), 1)
+        self.assertEqual(window.note.body, "edited body keeps a single block")
+        self.assertEqual(window.note.metadata.title, "edited body keeps a single block")
+        self.assertNotIn("---", window.note.body)
+
+    def test_remote_new_note_command_creates_note_without_second_instance(self) -> None:
+        self.assertEqual(self.app.storage.list_notes(), [])
+
+        self.app.enqueue_remote_command("new-note")
+        self.app._poll_remote_commands()
+
+        notes = self.app.storage.list_notes()
+        self.assertEqual(len(notes), 1)
+
+    def test_remote_json_new_note_command_supports_body(self) -> None:
+        self.app.enqueue_remote_command(json.dumps({"command": "new-note", "body": "from remote"}))
+
+        self.app._poll_remote_commands()
+
+        notes = self.app.storage.list_notes()
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(notes[0].body, "from remote")
+
+    def test_remote_move_resize_command_updates_open_window_geometry(self) -> None:
+        self.app.create_and_open_note(body="Move me")
+        window = next(iter(self.app.windows.values()))
+        note_id = window.note.metadata.note_id
+
+        self.app.enqueue_remote_command(
+            json.dumps(
+                {
+                    "command": "move-resize-note",
+                    "note_id": note_id,
+                    "x": 120,
+                    "y": 140,
+                    "width": 280,
+                    "height": 220,
+                    "focus": False,
+                }
+            )
+        )
+
+        self.app._poll_remote_commands()
+
+        updated = self.app.storage.load_note(note_id)
+        self.assertEqual((updated.metadata.x, updated.metadata.y), (120, 140))
+        self.assertEqual((updated.metadata.width, updated.metadata.height), (280, 220))
+
+    def test_parse_remote_command_accepts_json_payload(self) -> None:
+        payload = app_module.parse_remote_command('{"command":"show-note","note_id":"abc123"}')
+
+        self.assertEqual(payload["command"], "show-note")
+        self.assertEqual(payload["note_id"], "abc123")
 
 
 if __name__ == "__main__":

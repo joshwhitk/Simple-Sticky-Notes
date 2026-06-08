@@ -4,9 +4,22 @@ import tempfile
 import unittest
 from pathlib import Path
 
+try:
+    import yaml
+except ImportError:  # PyYAML is a test-only convenience, not a runtime dependency
+    yaml = None
+
 from simple_sticky_notes.models import AppSettings
 from simple_sticky_notes.app import editor_body_for_display, note_menu_label, persisted_body_from_editor, selection_bg_for
-from simple_sticky_notes.storage import StickyStorage, note_title, suggested_file_stem
+from simple_sticky_notes.storage import (
+    StickyStorage,
+    format_note_with_frontmatter,
+    merge_frontmatter,
+    note_title,
+    split_frontmatter,
+    strip_frontmatter,
+    suggested_file_stem,
+)
 
 
 class StickyStorageTests(unittest.TestCase):
@@ -96,7 +109,9 @@ class StickyStorageTests(unittest.TestCase):
         self.storage.save_note(note)
         self.assertTrue(old_path.exists())
         self.assertFalse((Path(self.tempdir.name) / "New title.md").exists())
-        self.assertEqual(old_path.read_text(encoding="utf-8"), "New title")
+        # File contains frontmatter, but when loaded the body strips it
+        reloaded = self.storage.load_note(note.metadata.note_id)
+        self.assertEqual(reloaded.body, "New title")
 
     def test_storage_migrates_legacy_notes_and_metadata_layout(self) -> None:
         root = Path(self.tempdir.name)
@@ -104,6 +119,7 @@ class StickyStorageTests(unittest.TestCase):
         legacy_meta_dir = root / "meta"
         legacy_notes_dir.mkdir()
         legacy_meta_dir.mkdir()
+        # Legacy notes don't have frontmatter
         (legacy_notes_dir / "Migrated Note.md").write_text("hello", encoding="utf-8")
         (legacy_meta_dir / "abc123.json").write_text(
             '{"note_id":"abc123","title":"Migrated Note","x":1,"y":2,"width":300,"height":200,"is_open":true,"created_at":"2026-01-01T00:00:00+00:00","updated_at":"2026-01-01T00:00:00+00:00","bg_color":"#ffd54f","file_stem":"Migrated Note"}',
@@ -126,6 +142,101 @@ class StickyStorageTests(unittest.TestCase):
             note_title("one two three four five six seven eight nine ten eleven twelve"),
             "one two three four five six seven eight nine ten",
         )
+
+    @unittest.skipUnless(yaml is not None, "PyYAML not installed")
+    def test_frontmatter_title_is_first_nonblank_line_with_stickynote_tag(self) -> None:
+        wrapped = format_note_with_frontmatter("\n\n# My Heading\nSecond line")
+        parsed = yaml.safe_load(wrapped.split("\n---\n", 1)[0])
+        self.assertEqual(parsed["title"], "My Heading")
+        self.assertEqual(parsed["tags"], ["stickynote"])
+
+    @unittest.skipUnless(yaml is not None, "PyYAML not installed")
+    def test_frontmatter_title_is_valid_yaml_for_special_characters(self) -> None:
+        # Titles with colons, quotes, leading dashes, brackets must stay valid YAML
+        # so Obsidian can parse the properties block.
+        for first_line in [
+            "foo: bar",
+            'has "double" quotes',
+            "4.5mm clear acrylic:",
+            "--- looks like a rule ---",
+            "[wiki] #tag {brace}",
+            "back\\slash",
+        ]:
+            wrapped = format_note_with_frontmatter(first_line)
+            parsed = yaml.safe_load(wrapped.split("\n---\n", 1)[0])
+            self.assertEqual(parsed["title"], first_line)
+            self.assertEqual(parsed["tags"], ["stickynote"])
+
+    def test_strip_frontmatter_is_exact_inverse_including_rule_lines(self) -> None:
+        for body in [
+            "plain note",
+            "first line stays\nsecond line",
+            "body with a\n---\nhorizontal rule",
+            "--- leading rule line ---\nthen body",
+            "---",
+            "",
+        ]:
+            self.assertEqual(strip_frontmatter(format_note_with_frontmatter(body)), body)
+
+    def test_strip_frontmatter_leaves_content_without_frontmatter_untouched(self) -> None:
+        legacy = "no frontmatter here\njust text"
+        self.assertEqual(strip_frontmatter(legacy), legacy)
+
+    def test_saving_preserves_user_frontmatter_and_adds_stickynote_tag(self) -> None:
+        # A sticky note the user also edited in Obsidian to add their own
+        # properties and tags must keep them; only title + stickynote are owned.
+        note = self.storage.create_note(body="placeholder")
+        note_path = self.storage.note_path(note.metadata.note_id)
+        note_path.write_text(
+            "---\n"
+            'title: "stale"\n'
+            "aliases:\n"
+            "  - nickname\n"
+            "tags:\n"
+            "  - personal\n"
+            "cssclass: wide\n"
+            "---\n"
+            "New first line\nbody continues",
+            encoding="utf-8",
+        )
+
+        # Reload (strips frontmatter) then save (re-merges from the on-disk YAML).
+        reloaded = self.storage.load_note(note.metadata.note_id)
+        self.assertEqual(reloaded.body, "New first line\nbody continues")
+        self.storage.save_note(reloaded)
+
+        block, body = split_frontmatter(note_path.read_text(encoding="utf-8"))
+        self.assertEqual(body, "New first line\nbody continues")
+        self.assertIn('title: "New first line"', block)
+        self.assertIn("aliases:", block)
+        self.assertIn("- nickname", block)
+        self.assertIn("cssclass: wide", block)
+        self.assertIn("- personal", block)
+        self.assertIn("- stickynote", block)
+
+    @unittest.skipUnless(yaml is not None, "PyYAML not installed")
+    def test_merge_frontmatter_handles_tag_representations(self) -> None:
+        cases = {
+            "tags:\n  - work\n": ["work", "stickynote"],
+            "tags: [work, ideas]\n": ["work", "ideas", "stickynote"],
+            "tags: work\n": ["work", "stickynote"],
+            "aliases:\n  - a\n": ["stickynote"],
+            "tags:\n  - stickynote\n  - work\n": ["stickynote", "work"],
+        }
+        for existing, expected_tags in cases.items():
+            block = merge_frontmatter(existing, "Some title")
+            parsed = yaml.safe_load(block)
+            self.assertCountEqual(parsed["tags"], expected_tags, msg=existing)
+
+    def test_saving_note_writes_single_frontmatter_block_and_loads_clean_body(self) -> None:
+        note = self.storage.create_note(body="hello\nworld")
+        raw = self.storage.note_path(note.metadata.note_id).read_text(encoding="utf-8")
+        self.assertEqual(raw.count("stickynote"), 1)
+        # Re-saving (e.g. a geometry update) must not accumulate frontmatter blocks.
+        self.storage.save_note(self.storage.load_note(note.metadata.note_id))
+        raw = self.storage.note_path(note.metadata.note_id).read_text(encoding="utf-8")
+        self.assertEqual(raw.count("stickynote"), 1)
+        self.assertEqual(self.storage.load_note(note.metadata.note_id).body, "hello\nworld")
 
 
 if __name__ == "__main__":

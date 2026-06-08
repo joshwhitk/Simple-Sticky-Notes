@@ -11,11 +11,51 @@ from .windows_integration import resource_root
 if TYPE_CHECKING:
     from .app import StickyNotesApp
 
+try:
+    import pystray._win32 as pystray_win32
+except ImportError:  # pragma: no cover - Windows is the only supported runtime.
+    pystray_win32 = None
+
+
+class StickyNotesTrayIcon(pystray.Icon):
+    def _on_notify(self, wparam, lparam):
+        if (
+            pystray_win32 is not None
+            and self._menu_handle
+            and lparam in (pystray_win32.win32.WM_LBUTTONUP, pystray_win32.win32.WM_RBUTTONUP)
+        ):
+            self._show_popup_menu()
+            return
+        super()._on_notify(wparam, lparam)
+
+    def _show_popup_menu(self) -> None:
+        if pystray_win32 is None or not self._menu_handle:
+            return
+
+        pystray_win32.win32.SetForegroundWindow(self._hwnd)
+
+        point = pystray_win32.wintypes.POINT()
+        pystray_win32.win32.GetCursorPos(pystray_win32.ctypes.byref(point))
+
+        hmenu, descriptors = self._menu_handle
+        index = pystray_win32.win32.TrackPopupMenuEx(
+            hmenu,
+            pystray_win32.win32.TPM_RIGHTALIGN
+            | pystray_win32.win32.TPM_BOTTOMALIGN
+            | pystray_win32.win32.TPM_RETURNCMD,
+            point.x,
+            point.y,
+            self._menu_hwnd,
+            None,
+        )
+        if index > 0:
+            descriptors[index - 1](self)
+
 
 class TrayController:
     def __init__(self, app: "StickyNotesApp") -> None:
         self.app = app
-        self.icon = pystray.Icon(
+        self.icon = StickyNotesTrayIcon(
             "simple-sticky-notes",
             self._load_icon_image(),
             "Simple Sticky Notes",

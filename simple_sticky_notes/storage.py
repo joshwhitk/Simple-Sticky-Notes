@@ -78,7 +78,8 @@ class StickyStorage:
         note_path = self._note_path_for_metadata(metadata)
         if not note_path.exists():
             note_path = self._legacy_note_path(note_id)
-        body = note_path.read_text(encoding="utf-8") if note_path.exists() else ""
+        content = note_path.read_text(encoding="utf-8") if note_path.exists() else ""
+        body = strip_frontmatter(content)
         return NoteRecord(metadata=metadata, body=body)
 
     def save_note(self, note: NoteRecord) -> None:
@@ -86,7 +87,11 @@ class StickyStorage:
         if not note.metadata.file_stem:
             note.metadata.file_stem = self.make_unique_file_stem(note.metadata.note_id, note.metadata.title)
         note_path = self._existing_note_path(note.metadata)
-        note_path.write_text(note.body, encoding="utf-8")
+        existing_frontmatter = None
+        if note_path.exists():
+            existing_frontmatter, _ = split_frontmatter(note_path.read_text(encoding="utf-8"))
+        note_content = format_note_with_frontmatter(note.body, existing_frontmatter)
+        note_path.write_text(note_content, encoding="utf-8")
         self.save_metadata(note.metadata)
 
     def save_metadata(self, metadata: NoteMetadata) -> None:
@@ -237,6 +242,137 @@ def suggested_file_stem(title: str) -> str:
 def collapsed_note_text(text: str) -> str:
     flattened = " ".join(line.strip().lstrip("#").strip() for line in text.splitlines() if line.strip())
     return flattened or "Untitled note"
+
+
+def first_nonblank_line(text: str) -> str | None:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped.lstrip("#").strip()
+    return None
+
+
+STICKYNOTE_TAG = "stickynote"
+_TOP_LEVEL_KEY_RE = re.compile(r"^([^\s:#][^:]*):(.*)$")
+_LIST_ITEM_RE = re.compile(r"^(\s*)-\s*(.*)$")
+
+
+def _yaml_double_quote(value: str) -> str:
+    """Return value as a YAML double-quoted scalar so titles containing
+    colons, quotes, leading dashes, etc. produce valid frontmatter."""
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def split_frontmatter(content: str) -> tuple[str | None, str]:
+    """Split content into (frontmatter_block, body). frontmatter_block is the
+    inner text between the leading '---' delimiter lines (no delimiters), or
+    None when there is no frontmatter. Only lines that are exactly '---'
+    delimit the block, so a markdown rule inside the body is preserved."""
+    lines = content.splitlines(keepends=True)
+    if not lines or lines[0].strip() != "---":
+        return None, content
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return "".join(lines[1:i]), "".join(lines[i + 1:])
+    return None, content
+
+
+def strip_frontmatter(content: str) -> str:
+    """Return the note body with any leading YAML frontmatter removed."""
+    return split_frontmatter(content)[1]
+
+
+def _norm_tag(value: str) -> str:
+    return value.strip().strip("'\"").strip()
+
+
+def _parse_top_level_entries(block: str) -> list[dict]:
+    """Parse a frontmatter block into ordered top-level entries. Each entry is
+    {"key": str|None, "lines": [str, ...]} where indented/blank/comment lines
+    attach to the preceding key so arbitrary nested values stay verbatim."""
+    entries: list[dict] = []
+    current: dict | None = None
+    for line in block.splitlines():
+        is_top_level_key = bool(_TOP_LEVEL_KEY_RE.match(line)) and not line[:1].isspace()
+        if is_top_level_key:
+            current = {"key": _TOP_LEVEL_KEY_RE.match(line).group(1).strip(), "lines": [line]}
+            entries.append(current)
+        elif current is None:
+            current = {"key": None, "lines": [line]}
+            entries.append(current)
+        else:
+            current["lines"].append(line)
+    return entries
+
+
+def _set_title_entry(entries: list[dict], title: str) -> None:
+    title_line = f"title: {_yaml_double_quote(title)}"
+    for entry in entries:
+        if entry["key"] == "title":
+            entry["lines"] = [title_line]
+            return
+    entries.insert(0, {"key": "title", "lines": [title_line]})
+
+
+def _ensure_stickynote_tag(entries: list[dict]) -> None:
+    tags_entry = next((e for e in entries if e["key"] in ("tags", "tag")), None)
+    if tags_entry is None:
+        entries.append({"key": "tags", "lines": ["tags:", f"  - {STICKYNOTE_TAG}"]})
+        return
+
+    first_line = tags_entry["lines"][0]
+    inline_value = first_line.split(":", 1)[1].strip()
+
+    if inline_value.startswith("["):
+        items = [item for item in (i.strip() for i in inline_value[1:-1].split(",")) if item]
+        if any(_norm_tag(item) == STICKYNOTE_TAG for item in items):
+            return
+        items.append(STICKYNOTE_TAG)
+        tags_entry["lines"][0] = f"{first_line.split(':', 1)[0]}: [{', '.join(items)}]"
+        return
+
+    if inline_value and inline_value not in ("~", "null"):
+        # Scalar value like `tags: foo` -> promote to a flow list with our tag.
+        if _norm_tag(inline_value) == STICKYNOTE_TAG:
+            return
+        tags_entry["lines"][0] = f"{first_line.split(':', 1)[0]}: [{inline_value}, {STICKYNOTE_TAG}]"
+        return
+
+    # Block list (or empty): inspect indented `- item` children.
+    indent = "  "
+    for child in tags_entry["lines"][1:]:
+        item = _LIST_ITEM_RE.match(child)
+        if item:
+            indent = item.group(1) or indent
+            if _norm_tag(item.group(2)) == STICKYNOTE_TAG:
+                return
+    tags_entry["lines"].append(f"{indent}- {STICKYNOTE_TAG}")
+
+
+def _render_entries(entries: list[dict]) -> str:
+    lines = [line for entry in entries for line in entry["lines"]]
+    return "\n".join(lines) + "\n"
+
+
+def merge_frontmatter(existing_block: str | None, title: str) -> str:
+    """Build a frontmatter block that sets the auto-title and guarantees the
+    stickynote tag, preserving every other property/tag from existing_block."""
+    if not existing_block or not existing_block.strip():
+        return f"title: {_yaml_double_quote(title)}\ntags:\n  - {STICKYNOTE_TAG}\n"
+    entries = _parse_top_level_entries(existing_block)
+    _set_title_entry(entries, title)
+    _ensure_stickynote_tag(entries)
+    return _render_entries(entries)
+
+
+def format_note_with_frontmatter(body: str, existing_frontmatter: str | None = None) -> str:
+    """Prepend frontmatter to body. When existing_frontmatter is given (the
+    note's current on-disk YAML), its properties are preserved and only the
+    title and stickynote tag are updated."""
+    title = first_nonblank_line(body) or "Untitled note"
+    block = merge_frontmatter(existing_frontmatter, title)
+    return f"---\n{block}---\n{body}"
 
 
 def remove_empty_dirs(path: Path) -> None:

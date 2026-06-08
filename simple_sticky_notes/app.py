@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import ctypes
+import json
+import math
 import tkinter as tk
 from pathlib import Path
+from queue import Empty, Queue
 from tkinter import filedialog
 from tkinter import font as tkfont
 from tkinter import messagebox
@@ -11,7 +14,8 @@ from typing import Callable
 from .models import NoteRecord
 from .runtime_state import mark_app_launch, mark_clean_shutdown
 from .settings import copy_storage_contents, load_settings, save_settings
-from .storage import StickyStorage, note_title
+from .single_instance import InstanceServer
+from .storage import StickyStorage, note_title, strip_frontmatter
 from .tray import TrayController
 from .windows_integration import edit_in_notepad, edit_in_obsidian, show_folder
 
@@ -52,6 +56,9 @@ COMMON_FONT_FAMILIES = [
     "Trebuchet MS",
     "Verdana",
 ]
+
+TIDY_PADDING = 12
+TIDY_GAP = 12
 
 
 class NoteWindow:
@@ -520,7 +527,7 @@ class NoteWindow:
         note_path = self.storage.note_path(self.note.metadata.note_id)
         if not note_path.exists():
             return ""
-        return note_path.read_text(encoding="utf-8")
+        return strip_frontmatter(note_path.read_text(encoding="utf-8"))
 
     def _handle_deleted_from_disk(self) -> None:
         if self._autosave_job:
@@ -550,6 +557,9 @@ class StickyNotesApp:
         self.storage = StickyStorage(self.settings)
         self.windows: dict[str, NoteWindow] = {}
         self._is_shutting_down = False
+        self._command_queue: Queue[str] = Queue()
+        self._command_poll_job: str | None = None
+        self._instance_server: InstanceServer | None = None
         self.session_id = ""
         self.previous_shutdown_clean = True
         self.root = tk.Tk()
@@ -557,16 +567,22 @@ class StickyNotesApp:
         self.root.protocol("WM_DELETE_WINDOW", self.shutdown)
         self.tray = TrayController(self)
 
-    def run(self, *, create_new_note: bool = False) -> int:
+    def attach_instance_server(self, server: InstanceServer) -> None:
+        self._instance_server = server
+
+    def run(self, *, create_new_note: bool = False, initial_note_bodies: list[str] | None = None) -> int:
         self.session_id, self.previous_shutdown_clean = mark_app_launch()
         self.tray.start()
+        self._schedule_command_poll()
         self.reconcile_storage()
-        if create_new_note:
+        open_notes = self.storage.list_open_notes()
+        for note in open_notes:
+            self.open_note(note)
+        if initial_note_bodies:
+            for body in initial_note_bodies:
+                self.create_and_open_note(body=body)
+        elif create_new_note:
             self.new_note()
-        else:
-            open_notes = self.storage.list_open_notes()
-            for note in open_notes:
-                self.open_note(note)
 
         self.root.mainloop()
         return 0
@@ -591,6 +607,7 @@ class StickyNotesApp:
             bg_color=bg_color,
         )
         self.open_note(note)
+        return note
 
     def open_note(self, note: NoteRecord) -> None:
         existing = self.windows.get(note.metadata.note_id)
@@ -619,6 +636,69 @@ class StickyNotesApp:
         if not stored_note.metadata.is_open:
             stored_note = self.storage.reopen_note(note_id)
         self.open_note(stored_note)
+
+    def move_resize_note(
+        self,
+        note_id: str,
+        *,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        focus: bool = False,
+    ) -> None:
+        note = self.storage.load_note(note_id)
+        note.metadata.x = x
+        note.metadata.y = y
+        note.metadata.width = width
+        note.metadata.height = height
+        self.storage.save_note(note)
+
+        existing = self.windows.get(note_id)
+        if existing:
+            existing.note = self.storage.load_note(note_id)
+            existing.window.geometry(f"{width}x{height}+{x}+{y}")
+            existing._position_controls()
+            existing._apply_rounded_corners()
+            if focus:
+                existing.focus_for_edit()
+        elif focus:
+            self.show_note(note_id)
+
+    def tidy_open_notes_to_main_screen(self) -> dict[str, int]:
+        open_note_ids = [note_id for note_id, window in self.windows.items() if window.window.winfo_exists()]
+        if not open_note_ids:
+            return {"count": 0}
+
+        left, top, right, bottom = main_work_area()
+        work_width = max(right - left, 1)
+        work_height = max(bottom - top, 1)
+
+        count = len(open_note_ids)
+        columns = max(1, math.ceil(math.sqrt(count * (work_width / max(work_height, 1)))))
+        rows = math.ceil(count / columns)
+
+        available_width = max(work_width - (TIDY_PADDING * 2) - (TIDY_GAP * (columns - 1)), 1)
+        available_height = max(work_height - (TIDY_PADDING * 2) - (TIDY_GAP * (rows - 1)), 1)
+        note_width = max(140, available_width // columns)
+        note_height = max(100, available_height // rows)
+
+        for index, note_id in enumerate(open_note_ids):
+            row = index // columns
+            column = index % columns
+            x = left + TIDY_PADDING + (column * (note_width + TIDY_GAP))
+            y = top + TIDY_PADDING + (row * (note_height + TIDY_GAP))
+            clamped_x = min(x, right - note_width)
+            clamped_y = min(y, bottom - note_height)
+            self.move_resize_note(
+                note_id,
+                x=clamped_x,
+                y=clamped_y,
+                width=note_width,
+                height=note_height,
+            )
+
+        return {"count": count, "columns": columns, "rows": rows}
 
     def update_font_settings(self, *, font_family: str | None = None, font_size: int | None = None) -> None:
         if font_family:
@@ -680,12 +760,24 @@ class StickyNotesApp:
         if refresh_tray:
             self.tray.refresh()
 
+    def enqueue_remote_command(self, command: str) -> None:
+        self._command_queue.put(command)
+
     def shutdown(self) -> None:
         if self._is_shutting_down:
             return
         self._is_shutting_down = True
         if self.session_id:
             mark_clean_shutdown(self.session_id)
+        if self._instance_server is not None:
+            self._instance_server.stop()
+            self._instance_server = None
+        if self._command_poll_job and self.root.winfo_exists():
+            try:
+                self.root.after_cancel(self._command_poll_job)
+            except tk.TclError:
+                pass
+            self._command_poll_job = None
         self.tray.stop()
         for window in list(self.windows.values()):
             try:
@@ -695,6 +787,94 @@ class StickyNotesApp:
         self.windows.clear()
         self.root.quit()
         self.root.destroy()
+
+    def _schedule_command_poll(self) -> None:
+        self._command_poll_job = self.root.after(150, self._poll_remote_commands)
+
+    def _poll_remote_commands(self) -> None:
+        self._command_poll_job = None
+        while True:
+            try:
+                command = self._command_queue.get_nowait()
+            except Empty:
+                break
+            self._handle_remote_command(command)
+        if not self._is_shutting_down and self.root.winfo_exists():
+            self._schedule_command_poll()
+
+    def _handle_remote_command(self, command: str) -> None:
+        payload = parse_remote_command(command)
+        command_name = payload["command"]
+
+        if command_name == "new-note":
+            body = str(payload.get("body", ""))
+            bg_color = str(payload.get("bg_color", DEFAULT_NOTE_BG))
+            x = int(payload.get("x", 80))
+            y = int(payload.get("y", 80))
+            self.create_and_open_note(body=body, x=x, y=y, bg_color=bg_color)
+            return
+
+        if command_name == "show-note":
+            self.show_note(str(payload["note_id"]))
+            return
+
+        if command_name == "move-resize-note":
+            self.move_resize_note(
+                str(payload["note_id"]),
+                x=int(payload["x"]),
+                y=int(payload["y"]),
+                width=int(payload["width"]),
+                height=int(payload["height"]),
+                focus=bool(payload.get("focus", False)),
+            )
+            return
+
+        if command_name == "tidy-notes":
+            self.tidy_open_notes_to_main_screen()
+            return
+
+        if command_name == "open-in-obsidian":
+            note_path = self.storage.note_path(str(payload["note_id"]))
+            edit_in_obsidian(note_path)
+            return
+
+        if command_name == "reveal-in-explorer":
+            note_path = self.storage.note_path(str(payload["note_id"]))
+            show_folder(note_path.parent)
+
+
+def parse_remote_command(command: str) -> dict[str, object]:
+    try:
+        payload = json.loads(command)
+    except json.JSONDecodeError:
+        return {"command": command}
+    if isinstance(payload, dict) and isinstance(payload.get("command"), str):
+        return payload
+    raise ValueError(f"invalid remote command payload: {command}")
+
+
+class RECT(ctypes.Structure):
+    _fields_ = [
+        ("left", ctypes.c_long),
+        ("top", ctypes.c_long),
+        ("right", ctypes.c_long),
+        ("bottom", ctypes.c_long),
+    ]
+
+
+def main_work_area() -> tuple[int, int, int, int]:
+    rect = RECT()
+    try:
+        success = ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(rect), 0)
+    except AttributeError:
+        success = 0
+    if success:
+        return (rect.left, rect.top, rect.right, rect.bottom)
+    width = ctypes.windll.user32.GetSystemMetrics(0)
+    height = ctypes.windll.user32.GetSystemMetrics(1)
+    return (0, 0, width, height)
+
+
 def editor_body_for_display(body: str) -> str:
     return body + "\n"
 

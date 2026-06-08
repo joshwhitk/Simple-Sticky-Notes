@@ -92,7 +92,11 @@ $shortcut.IconLocation = '{escaped_icon}'
 $shortcut.WorkingDirectory = '{escaped_working_dir}'
 $shortcut.Save()
 """
-    subprocess.run(["powershell", "-NoProfile", "-Command", script], check=True)
+    subprocess.run(
+        ["powershell", "-NoProfile", "-Command", script],
+        check=True,
+        creationflags=subprocess.CREATE_NO_WINDOW,  # don't flash a PS window on Windows
+    )
 
 
 def install_windows_shortcuts() -> dict[str, str]:

@@ -40,6 +40,23 @@ class SettingsTests(unittest.TestCase):
             self.assertTrue((default / "notes" / "Legacy note.md").exists())
             save_mock.assert_called_once()
 
+    def test_migrate_obsidian_vault_storage_root_switches_to_active_vault(self) -> None:
+        with tempfile.TemporaryDirectory() as sandbox_dir, tempfile.TemporaryDirectory() as active_vault_dir:
+            legacy_root = Path(sandbox_dir) / "old-vault" / "Simple Sticky Notes"
+            active_root = Path(active_vault_dir) / "Simple Sticky Notes"
+            (legacy_root / "Moved note.md").parent.mkdir(parents=True, exist_ok=True)
+            (legacy_root / "Moved note.md").write_text("moved", encoding="utf-8")
+            app_settings = AppSettings(storage_root=str(legacy_root))
+
+            with mock.patch.object(settings_module, "DEFAULT_STORAGE_ROOT", active_root), mock.patch.object(
+                settings_module, "save_settings"
+            ) as save_mock:
+                migrated = settings_module.migrate_obsidian_vault_storage_root(app_settings)
+
+            self.assertEqual(migrated.storage_root, str(active_root))
+            self.assertEqual((active_root / "Moved note.md").read_text(encoding="utf-8"), "moved")
+            save_mock.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
