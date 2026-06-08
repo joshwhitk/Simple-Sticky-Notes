@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.StickyNotes" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/sticky_yellow</item>
+        <item name="colorPrimaryDark">@color/sticky_yellow</item>
+    </style>
+
+    <style name="Theme.StickyNotes.Editor" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/sticky_yellow</item>
+    </style>
+</resources>
