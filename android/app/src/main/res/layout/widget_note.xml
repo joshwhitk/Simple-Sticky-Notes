@@ -7,11 +7,13 @@
     android:background="@drawable/widget_bg"
     android:padding="6dp">
 
+    <!-- Title wraps onto multiple lines (down into the body area) so long titles
+         stay readable in a 1x1 widget; it's still the first line when opened. -->
     <TextView
         android:id="@+id/w_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:maxLines="1"
+        android:maxLines="4"
         android:ellipsize="end"
         android:textColor="@color/sticky_text"
         android:textStyle="bold"
