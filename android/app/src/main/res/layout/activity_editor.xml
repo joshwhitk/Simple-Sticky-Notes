@@ -1,38 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Autosaves as you type — no buttons. Remove a sticky by dragging its widget off the home screen. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@color/sticky_yellow"
     android:padding="10dp">
 
     <EditText
         android:id="@+id/editor_text"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:background="@android:color/transparent"
         android:gravity="top|start"
         android:hint="Write a sticky note…"
         android:inputType="textMultiLine|textCapSentences"
         android:textColor="@color/sticky_text"
         android:textSize="16sp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <Button
-            android:id="@+id/save_button"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Save" />
-        <Button
-            android:id="@+id/delete_button"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Delete" />
-    </LinearLayout>
-</LinearLayout>
+</FrameLayout>

@@ -1,8 +1,5 @@
 <resources>
-    <string name="app_name">Sticky Notes</string>
-    <string name="widget_note_label">Sticky Note</string>
-    <string name="widget_new_label">New Sticky Note</string>
-    <string name="widget_pick_prompt">Tap to pick a note</string>
-    <string name="config_pick">Pick a sticky note for this widget</string>
-    <string name="new_sticky">+ New sticky</string>
+    <string name="app_name">A New Stickynote</string>
+    <string name="widget_note_label">Spawn</string>
+    <string name="widget_pick_prompt">Tap to create a sticky note</string>
 </resources>

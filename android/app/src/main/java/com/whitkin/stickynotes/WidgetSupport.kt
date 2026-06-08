@@ -9,7 +9,6 @@ import android.os.Build
 import android.widget.Toast
 
 const val EXTRA_NOTE_PATH = "note_path"
-const val EXTRA_PIN_ON_SAVE = "pin_on_save"
 const val MAX_NOTE_WIDGETS = 40
 
 /** Refreshes all per-note widgets (call after a note is saved/deleted). */

@@ -48,19 +48,6 @@
                 android:resource="@xml/note_widget_info" />
         </receiver>
 
-        <!-- "New sticky note" widget -->
-        <receiver
-            android:name=".NewNoteWidgetProvider"
-            android:exported="true"
-            android:label="@string/widget_new_label">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/new_note_widget_info" />
-        </receiver>
-
         <!-- Receives the appWidgetId after a successful pin request, to bind it to a note. -->
         <receiver
             android:name=".PinCallbackReceiver"

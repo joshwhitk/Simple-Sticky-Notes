@@ -9,5 +9,6 @@
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:initialLayout="@layout/widget_note"
+    android:configure="com.whitkin.stickynotes.NoteWidgetConfigActivity"
     android:previewImage="@mipmap/ic_launcher"
     android:updatePeriodMillis="0" />

@@ -4,44 +4,48 @@ import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
-import android.widget.ArrayAdapter
-import android.widget.ListView
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
-/** Lets the user bind an (unbound, tray-added) note widget to an existing sticky note. */
+/**
+ * Runs when a sticky-note widget is added from the launcher's widget tray.
+ * Adding a widget = creating a NEW sticky note: this immediately opens the editor
+ * for a fresh note, then binds the resulting note to the widget so it displays the
+ * content. If the user writes nothing, the placement is cancelled (no empty widget).
+ */
 class NoteWidgetConfigActivity : AppCompatActivity() {
+
+    private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val appWidgetId = intent.getIntExtra(
+        appWidgetId = intent.getIntExtra(
             AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID
         )
-        setResult(Activity.RESULT_CANCELED)
+        setResult(Activity.RESULT_CANCELED)  // backing out = widget not placed
 
-        val vault = Settings.vaultDir(this)
-        if (vault == null) {
+        if (Settings.vaultDir(this) == null) {
             Toast.makeText(this, "Open the app and pick your vault folder first.", Toast.LENGTH_LONG).show()
             finish(); return
         }
-        setContentView(R.layout.activity_config)
-        findViewById<TextView>(R.id.cfg_title).text = getString(R.string.config_pick)
-        val listView = findViewById<ListView>(R.id.cfg_list)
-
-        // Scan off the main thread — the vault can hold thousands of files.
-        Thread {
-            val notes = try { VaultStore(vault).listNotes() } catch (e: Exception) { emptyList() }
-            runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
-                listView.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, notes.map { it.title })
-                listView.setOnItemClickListener { _, _, pos, _ ->
-                    Settings.setWidgetNote(this, appWidgetId, notes[pos].file.absolutePath)
-                    NoteWidgetProvider.render(this, AppWidgetManager.getInstance(this), appWidgetId)
-                    setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
-                    finish()
-                }
-            }
-        }.start()
+        // Adding the widget creates a brand-new sticky note.
+        startActivityForResult(Intent(this, EditorActivity::class.java), REQ_NEW_NOTE)
     }
+
+    @Deprecated("startActivityForResult is fine for this one-shot config handoff")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQ_NEW_NOTE) return
+        val path = data?.getStringExtra(EXTRA_NOTE_PATH)
+        if (resultCode == Activity.RESULT_OK && path != null) {
+            Settings.setWidgetNote(this, appWidgetId, path)
+            NoteWidgetProvider.render(this, AppWidgetManager.getInstance(this), appWidgetId)
+            setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
+        } else {
+            setResult(Activity.RESULT_CANCELED)
+        }
+        finish()
+    }
+
+    companion object { private const val REQ_NEW_NOTE = 1 }
 }
