@@ -32,6 +32,7 @@ This repo is in active prototyping. The current implementation includes:
 - Windows desktop/startup shortcut installer
 - Right-click note menu for note switching, colors, fonts, and storage-folder changes
 - External file polling so open stickies can reload markdown edits made from Obsidian
+- Paste images from the clipboard straight into a note — saved under the vault's `_attachments/` folder and embedded as an Obsidian `![[image]]` wikilink
 - Built Windows installer flow with detected-vault storage prefill
 - Automated tests for storage, menu behavior, runtime recovery, and Obsidian integration
 - Windows icon assets for the app

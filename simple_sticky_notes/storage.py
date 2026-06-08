@@ -16,6 +16,8 @@ HIDDEN_APP_DIR_NAME = ".simple-sticky-notes"
 METADATA_DIR_NAME = "meta"
 LEGACY_NOTES_DIR_NAME = "notes"
 LEGACY_META_DIR_NAME = "meta"
+ATTACHMENTS_DIR_NAME = "_attachments"
+PASTED_IMAGE_PREFIX = "Pasted image"
 
 
 class StickyStorage:
@@ -99,6 +101,49 @@ class StickyStorage:
             json.dumps(asdict(metadata), indent=2),
             encoding="utf-8",
         )
+
+    def attachments_dir(self) -> Path:
+        return self.root / ATTACHMENTS_DIR_NAME
+
+    def save_clipboard_image(self, image, *, stamp: str | None = None) -> str:
+        """Save a PIL image into the vault's _attachments folder as PNG.
+
+        Returns the bare filename to embed as an Obsidian wikilink ``![[name]]``
+        (which resolves by basename anywhere in the vault). Mirrors Obsidian's
+        own ``Pasted image YYYYMMDDHHMMSS.png`` naming, de-duplicated with a
+        ``-N`` suffix.
+        """
+        from datetime import datetime
+
+        attach = self.attachments_dir()
+        attach.mkdir(parents=True, exist_ok=True)
+        stamp = stamp or datetime.now().strftime("%Y%m%d%H%M%S")
+        name = f"{PASTED_IMAGE_PREFIX} {stamp}.png"
+        dest = attach / name
+        counter = 1
+        while dest.exists():
+            name = f"{PASTED_IMAGE_PREFIX} {stamp}-{counter}.png"
+            dest = attach / name
+            counter += 1
+        image.save(str(dest), "PNG")
+        return name
+
+    def import_image_file(self, source: Path | str) -> str:
+        """Copy an existing image file into _attachments; return its filename."""
+        import shutil
+
+        source = Path(source)
+        attach = self.attachments_dir()
+        attach.mkdir(parents=True, exist_ok=True)
+        name = source.name
+        dest = attach / name
+        counter = 1
+        while dest.exists():
+            name = f"{source.stem}-{counter}{source.suffix}"
+            dest = attach / name
+            counter += 1
+        shutil.copy2(str(source), str(dest))
+        return name
 
     def list_note_ids(self) -> list[str]:
         return sorted(path.stem for path in self.meta_dir.glob("*.json"))

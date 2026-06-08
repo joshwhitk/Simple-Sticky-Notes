@@ -136,6 +136,7 @@ class NoteWindow:
         self.text.pack(fill="both", expand=True)
         self.text.insert("1.0", editor_body_for_display(note.body))
         self.text.bind("<<Modified>>", self._on_modified)
+        self.text.bind("<<Paste>>", self._on_paste)
         self.text.bind("<ButtonPress-1>", self._on_text_pointer_down)
         self.text.bind("<B1-Motion>", self._on_text_pointer_drag)
         self.text.bind("<ButtonRelease-1>", self._clear_pointer_state)
@@ -237,6 +238,55 @@ class NoteWindow:
             return self.text.get("sel.first", "sel.last")
         except tk.TclError:
             return ""
+
+    def _on_paste(self, _event: object | None = None) -> str | None:
+        """Intercept Ctrl+V / context-menu Paste: if the clipboard holds an image,
+        save it into the vault's _attachments folder and insert an Obsidian embed
+        (``![[name]]``) at the cursor. Otherwise fall through to normal text paste."""
+        image, files = self._clipboard_images()
+        if image is None and not files:
+            return None  # not an image — let Tk paste text as usual
+        names: list[str] = []
+        try:
+            if image is not None:
+                names.append(self.storage.save_clipboard_image(image))
+            for path in files:
+                names.append(self.storage.import_image_file(path))
+        except Exception as exc:  # noqa: BLE001 — surface any save failure to the user
+            messagebox.showerror(
+                "Simple Sticky Notes", f"Couldn't paste image: {exc}", parent=self.window
+            )
+            return "break"
+        if not names:
+            return None
+        try:
+            self.text.delete("sel.first", "sel.last")
+        except tk.TclError:
+            pass
+        self.text.insert("insert", "".join(f"![[{name}]]\n" for name in names))
+        self.flush_note()
+        return "break"
+
+    @staticmethod
+    def _clipboard_images() -> tuple[object | None, list[Path]]:
+        """Return (PIL image or None, [image file paths]) from the system clipboard."""
+        try:
+            from PIL import Image, ImageGrab
+        except Exception:
+            return None, []
+        try:
+            data = ImageGrab.grabclipboard()
+        except Exception:
+            return None, []
+        if isinstance(data, Image.Image):
+            return data, []
+        files: list[Path] = []
+        if isinstance(data, list):
+            exts = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tif", ".tiff")
+            for entry in data:
+                if str(entry).lower().endswith(exts):
+                    files.append(Path(entry))
+        return None, files
 
     def open_note_in_notepad(self) -> None:
         self._run_external_action(lambda: edit_in_notepad(self.storage.note_path(self.note.metadata.note_id)))

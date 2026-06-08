@@ -31,6 +31,32 @@ class StickyStorageTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
+    def test_save_clipboard_image_writes_png_and_returns_embed_name(self) -> None:
+        try:
+            from PIL import Image
+        except Exception:
+            self.skipTest("Pillow not installed")
+        img = Image.new("RGB", (4, 4), (255, 213, 79))
+        name = self.storage.save_clipboard_image(img, stamp="20260609120000")
+        self.assertEqual(name, "Pasted image 20260609120000.png")
+        saved = Path(self.tempdir.name) / "_attachments" / name
+        self.assertTrue(saved.exists())
+        # A second paste with the same stamp must not overwrite — it gets a -1 suffix.
+        name2 = self.storage.save_clipboard_image(img, stamp="20260609120000")
+        self.assertEqual(name2, "Pasted image 20260609120000-1.png")
+        self.assertTrue((Path(self.tempdir.name) / "_attachments" / name2).exists())
+
+    def test_import_image_file_copies_and_dedupes(self) -> None:
+        src = Path(self.tempdir.name) / "shot.png"
+        src.write_bytes(b"\x89PNG\r\n\x1a\n fake")
+        first = self.storage.import_image_file(src)
+        self.assertEqual(first, "shot.png")
+        second = self.storage.import_image_file(src)
+        self.assertEqual(second, "shot-1.png")
+        attach = Path(self.tempdir.name) / "_attachments"
+        self.assertTrue((attach / "shot.png").exists())
+        self.assertTrue((attach / "shot-1.png").exists())
+
     def test_create_note_persists_markdown_and_metadata(self) -> None:
         note = self.storage.create_note("Test note")
         self.assertTrue((Path(self.tempdir.name) / f"{note.metadata.file_stem}.md").exists())
