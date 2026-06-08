@@ -20,6 +20,9 @@ mirrors the Python test suite to guarantee byte-compatible round-trips.
 - **New-note widget** — tap creates a new sticky note, opens the editor, and
   offers to pin a per-note widget for it.
 - **In-app list/editor** — browse notes newest-first, create, edit, delete.
+- **Paste images** — long-press in the editor → Paste (or paste from the keyboard
+  clipboard) saves the image to the vault's `_attachments/` folder and inserts an
+  Obsidian `![[image]]` embed, matching the desktop app.
 
 ## Build (Windows)
 Requires the Android SDK (`C:\Users\Josh\Android\Sdk`, platform 34 + build-tools

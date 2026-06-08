@@ -70,6 +70,27 @@ class VaultStore(private val vaultDir: File) {
         return file
     }
 
+    /**
+     * Saves pasted image bytes into the vault's _attachments folder and returns the
+     * bare filename to embed as an Obsidian wikilink (`![[name]]`). Matches the
+     * desktop app: "Pasted image <timestamp>.<ext>", de-duplicated with a -N suffix.
+     */
+    fun saveAttachment(ext: String, bytes: ByteArray): String {
+        val dir = File(vaultDir, "_attachments")
+        dir.mkdirs()
+        val stamp = OffsetDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+        var name = "Pasted image $stamp.$ext"
+        var dest = File(dir, name)
+        var i = 1
+        while (dest.exists()) {
+            name = "Pasted image $stamp-$i.$ext"
+            dest = File(dir, name)
+            i++
+        }
+        dest.writeBytes(bytes)
+        return name
+    }
+
     fun deleteNote(file: File) {
         sidecarForStem(file.nameWithoutExtension)?.delete()
         file.delete()
