@@ -17,6 +17,8 @@ Thumbs.db
 dist/
 build/
 tmp/
+dist_stage_*/
+build_stage_*/
 *.spec
 
 # Obsidian test artifacts
@@ -29,3 +31,18 @@ obsidian-test-vault/.obsidian/plugins/
 # Experimental source checkouts
 obsidian-sticky-notes-plugin-src/
 obsidian-sticky-notes-plugin-src/node_modules/
+
+# Android (build/ and node_modules/ already ignored above)
+android/.gradle/
+android/captures/
+android/.idea/
+android/local.properties
+*.apk
+*.aab
+*.iml
+
+# One-off maintenance run logs (vault dedup / retitle / near-dup / link-fix)
+*_log.jsonl
+
+# Local agent / session data
+.claude/
