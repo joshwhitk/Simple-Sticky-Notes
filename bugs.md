@@ -16,7 +16,7 @@
 - Notes refresh bug: deleting a source `.md` file did not disappear from the sticky-note list because metadata survived. Fix applied: prune orphaned metadata during menu refresh and close any open sticky whose backing markdown file is deleted.
 - Windows integration path bug after moving the workspace: the existing desktop and startup `.lnk` files still targeted the previous folder because Windows shortcuts embed absolute target paths. Verified repair: rerun `python main.py --install-windows-integration` from the moved workspace to rewrite both shortcuts.
 - Window placement bug: choosing another note from the right-click note list only focused it at its previous coordinates, which made note switching awkward and left some notes effectively lost off-screen after monitor/layout changes. Planned fix: anchor note switching to the current note, clamp it to the active work area, and add a `Tidy Onto Main Screen` recovery action for all open notes.
-- Tray duplication bug: launching the app again while it is already running creates a second process and a second tray icon because each launch path starts a fresh `StickyNotesApp` and `pystray.Icon`. Planned fix: enforce a single running instance and forward `--new-note` commands to that existing process.
+- Tray duplication bug: launching the app again while it was already running created a second process and a second tray icon because each launch path started a fresh `StickyNotesApp` and `pystray.Icon`. Diagnosis: there was no single-instance guard or IPC handoff in `cli.py`, so every launch became a full new app process. Fix applied: the first process now owns a localhost instance server, later launches exit instead of starting a second tray icon, and `--new-note` is forwarded into the existing process.
 - Obsidian layout bug: storing notes under `Simple Sticky Notes\notes\` and metadata under a visible `meta\` folder made the vault view unnecessarily cluttered. Fix applied: note markdown files now live directly under `Simple Sticky Notes`, and metadata migrates into a hidden `.simple-sticky-notes\meta` folder.
 - Installer shortcut bug: the packaged app's post-install `--install-windows-integration` step generated desktop/startup shortcuts that passed `_internal\main.py` to the frozen EXE, which made the shortcuts exit immediately without starting the tray app. Diagnosis: the source-mode shortcut builder was reused unchanged inside the packaged runtime. Fix applied: packaged installs now target the installed EXE directly and pass only supported CLI flags like `--new-note`.
 - Obsidian sync bug: note files were being renamed from the live note body on every save, so while editing in Obsidian the sticky app could rename the current markdown file underneath Obsidian and push focus into another note. The same naming policy also made the Obsidian inline title duplicate the note body. Diagnosis: `save_note` recalculated `file_stem` from the current body during both local saves and external disk refreshes. Fix applied: note titles now use the first 10 words of the note, filenames are assigned from that title when the note is created, and later saves keep the existing markdown filename stable.
@@ -24,7 +24,23 @@
 - Installed shortcut icon bug: the packaged shortcut generator set `IconLocation` to `_internal\assets\icons\simple-sticky-notes.ico`, but that file is not present in the installed app layout, so Windows fell back to a generic shortcut icon. Fix applied: packaged shortcuts now use the installed EXE as the icon source.
 - Machine-specific install corruption: the locally installed app under `%LOCALAPPDATA%\\Programs\\Simple Sticky Notes` was missing `base_library.zip` inside `_internal`, which caused `Failed to start embedded python interpreter: Failed to import encodings module` even with a correct desktop shortcut. Fix applied locally: reinstall `v1.0.2` over the existing install.
 - Installed tray/resource bug: after the shortcut arguments were fixed, launching the installed app could still crash with `Failed to execute script 'main'` because the tray icon loader looked for `assets\\icons\\simple-sticky-notes-64.png` beside the installed EXE instead of under PyInstaller's packaged resource root. Diagnosis: frozen installs were still using `project_root()` for runtime icon assets. Fix applied: packaged resource lookup now uses `sys._MEIPASS` through `resource_root()`, and `v1.0.3` was rebuilt and reinstalled successfully on this PC.
+- Tray interaction bug on Windows: the tray icon looked inert because `pystray` treated left click as a default-action trigger, but this app had no default tray action configured, so left click did nothing even though the popup menu existed. Diagnosis: the Win32 backend had a valid `_menu_handle`, but `_on_notify` only opened the popup menu on right click. Fix applied: the app now uses a custom Win32 tray icon class that opens the popup menu on both left and right click.
+- Obsidian vault move bug: if the active Obsidian vault moved to a new path, the app kept using the old `settings.json` storage root unless the user changed it manually, because the only automatic migration covered the Documents default and legacy Dropbox root. Fix applied: settings now migrate `Simple Sticky Notes` storage between Obsidian vault roots when the active vault changes, and this PC's live settings were updated to the new Dropbox-root vault.
+- External registry tooling bug: `node C:/Users/Josh/Dropbox/code/whitkin-apps/bin/whitkin-apps.js add simple-sticky-notes --cli ...` truncated the command path at the first space in `C:/Users/Josh/Dropbox/josh work/code/SimpleStickyNotes/...`, leaving a broken registry entry of `C:/Users/Josh/Dropbox/josh`. Workaround applied: patch the shared registry entry manually to use an `mcp` transport with `command: "node"` plus the script path in `args`.
+- Incremental MCP sync bug: the first `notes_changed_since` implementation used a strict `updated_at > since` filter, but note timestamps are only second-granularity, so two edits inside the same second could cause the later note to be omitted. Fix applied: changed-since now uses `>=` so consumers may see same-second duplicates but do not miss updates.
 
 ## Open Bugs
 
-- None currently tracked.
+## 2026-05-11 - Critical
+
+Summary:
+Path traversal via `note_id` allows reading or overwriting files outside the notes directory.
+
+Evidence:
+`note_id` comes from user input and is joined directly into a filesystem path in `storage.py` with no validation. A value like `../../sensitive-file` escapes the notes directory.
+
+Status:
+Open.
+
+Fix:
+Add a regex guard (e.g. `re.match(r'^[a-zA-Z0-9_-]+$', note_id)`) before any filesystem operation that uses `note_id`.

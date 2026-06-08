@@ -1,5 +1,7 @@
 # Store Assets Checklist
 
+Status: deferred. Keep this checklist for later if Microsoft Store work is resumed.
+
 This is the capture and art plan for the first Microsoft Store listing.
 
 ## Minimum Microsoft Requirements

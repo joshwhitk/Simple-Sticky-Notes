@@ -56,10 +56,14 @@ This repo is in active prototyping. The current implementation includes:
 
 ## Project Docs
 
+- [STATUS.MD](STATUS.MD)
+- [bugs.md](bugs.md)
+- [regression_tests.md](regression_tests.md)
 - [MRD](docs/MRD.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development](docs/DEVELOPMENT.md)
 - [Roadmap](docs/ROADMAP.md)
+- Store docs below are kept for deferred packaging work and prior Partner Center research:
 - [Store Submission](docs/STORE_SUBMISSION.md)
 - [Store Listing Draft](docs/STORE_LISTING_DRAFT.md)
 - [Store Assets Checklist](docs/STORE_ASSETS_CHECKLIST.md)
@@ -90,6 +94,27 @@ python main.py --install-windows-integration
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1
+```
+
+### Run the sticky-note MCP server
+
+```powershell
+node mcp-server/index.js
+```
+
+This repo is also registered in the shared Whitkin app registry as `simple-sticky-notes`, with the MCP server as its canonical transport.
+
+### Android companion app
+
+`android/` contains a Kotlin home-screen widget app that reads/writes the **same**
+vault markdown files (via Syncthing), using the identical `stickynote`-tag + sidecar
+format. `Frontmatter.kt` is a byte-compatible port of `storage.py`, verified by a
+unit-test suite that mirrors the Python tests. Build and wireless-deploy instructions
+are in [`android/README.md`](android/README.md).
+
+```powershell
+cd android
+.\gradlew.bat test assembleDebug   # -> simple-sticky-notes-1.0-debug.apk
 ```
 
 ### Move the repo folder
@@ -125,11 +150,15 @@ This keeps the markdown notes directly visible in Obsidian while the desktop app
 
 ```text
 .
+|-- android/                 # Kotlin home-screen widget companion app
 |-- assets/
 |   `-- icons/
 |-- docs/
+|-- mcp-server/
 |-- simple_sticky_notes/
 |-- tests/
+|-- tools/
+|   `-- vault-maintenance/   # one-off vault dedup / retitle / near-dup scripts
 |-- main.py
 |-- STATUS.MD
 |-- bugs.md
@@ -149,7 +178,7 @@ Obsidian pop-out windows are tied to Obsidian itself. That fails a key requireme
 
 ## Compared With Microsoft Sticky Notes
 
-`Simple Sticky Notes` for the Microsoft Store is coming soon.
+Microsoft Store distribution is currently deferred.
 
 Microsoft Sticky Notes does cover some adjacent use cases well. According to Microsoft Support, it:
 

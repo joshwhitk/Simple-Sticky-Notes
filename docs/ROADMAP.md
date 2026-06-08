@@ -18,3 +18,9 @@
 - Decide whether any other note-app interoperability is worth supporting at all
 - Improve multi-note management UX
 - Add richer metadata and search support
+
+## Deferred Distribution Track
+
+- Revisit Microsoft Store packaging only after the core desktop runtime work is stable.
+- Recover a viable Store submission path after the rejected `EXE` attempt and failed local `MSIX` attempt.
+- Revisit Store pricing only when Store packaging is working again.

@@ -1,38 +1,18 @@
+active: Standalone sticky notes work reliably; desktop polish and packaging remain.
+
 # Status
-
-## MRD Feature List
-
-- App name: `Simple Sticky Notes`.
-- Frameless sticky-note windows for Windows desktop use.
-- Notes are resizable.
-- Notes have a custom close `X` button without a normal Windows title bar or frame.
-- Closing a note removes it from the desktop without deleting the note file.
-- Very fast new-note creation from a desktop shortcut or icon.
-- Notes reopen automatically and restore position after reboot or login.
-- Notes remain usable as desktop objects without Obsidian running.
-- Each note remembers position and size.
-- Font family and font size are adjustable.
-- Notes persist to a normal file-backed store in a standard Windows user location, not an opaque app-only database.
-- Storage is Obsidian-readable markdown: `.md` note bodies plus sidecar metadata.
-- Multiple notes can stay open simultaneously.
-- Autosave should be reliable and low-friction.
-- Startup or login behavior should restore previously open notes and leave hidden notes hidden.
-- Open notes should reflect edits made from Obsidian against the shared markdown files.
-- Optional Obsidian integration may provide a control panel later, but the desktop app remains the runtime owner of sticky notes.
 
 ## In Progress
 
 ### Pri1
 
-- Change the Microsoft Store listing from free to a paid price around USD `$10`, using the Store pricing workflow that keeps the current review/publish status clear.
-- Enforce a single tray-backed app instance so launching `Simple Sticky Notes` or `--new-note` reuses the running process instead of creating duplicate tray icons.
+- Manually verify desktop-shortcut and taskbar drag-drop on this PC with real Explorer drops now that the packaged app accepts dropped files and shortcuts.
 - Move a selected note to the right of the current note when chosen from the right-click note list, clamped on-screen.
 - Add `Tidy Onto Main Screen` to the right-click menu so all open notes are moved and resized back onto the primary display.
 - Apply a native Windows drop shadow to frameless note windows if the OS window manager will honor it.
+- Validate autosave, startup restore, and hidden-note restore behavior in the packaged app on this PC.
 - Validate the packaged installer end-to-end on this PC, including the detected-vault storage prompt and installed shortcut behavior.
 - Verify the updated stable-filename Obsidian flow manually on this PC so editing in Obsidian no longer steals focus into another note.
-- Repackage the app for Microsoft Store submission as `MSIX` after the `EXE` submission path was rejected for missing code signing.
-- Recover the Microsoft Store release path after the first `MSIX` packaging attempt failed locally; keep public messaging at `coming soon` until Store packaging is actually working.
 - Keep the repo and docs aligned with the app as implementation and validation land.
 
 ## Planned
@@ -49,11 +29,25 @@
 - If an unrecoverable sync conflict ever occurs, preserve both edits in the note instead of silently discarding one side.
 - Decide whether interoperability with other note apps should exist at all, and if it does, whether it should be import-only, one-way sync, or full read-write.
 - Design a settings view for managing the companion app instead of relying only on context menus and config files.
+- Support sketching over sticky-note text with Windows touch or pen input as a deferred enhancement once the core text-note workflow is stable.
 
 ## Completed
 
+### Pri0
+
+- Revised `STATUS.MD` to keep active work grouped by status and priority, with the duplicate tray-icon bug tracked as an urgent item until the fix landed.
+- Enforced a single tray-backed app instance so launching `Simple Sticky Notes` or `--new-note` reuses the running process instead of creating duplicate tray icons.
+- Reorganized the repo docs so Microsoft Store material is clearly marked as deferred, and moved Store work into a `Pri4` deferred bucket instead of leaving it in active priorities.
+
 ### Pri1
 
+- Added a stdio MCP server plus a Python service bridge so other apps and agents can list, search, create, fetch, edit, hide, reopen, and delete sticky notes against the live Obsidian-backed storage root.
+- Registered `simple-sticky-notes` in the shared `whitkin-apps` registry with an `mcp` transport and validated the registry after fixing the CLI path-truncation issue caused by spaces in the Dropbox checkout path.
+- Expanded the sticky-note MCP surface so other apps and agents can also query live app status, list recently changed notes, create visible notes, show/focus notes, move/resize notes, tidy open notes onto the main screen, open notes in Obsidian, and reveal note folders in Explorer.
+- Fixed the first `notes_changed_since` pass so second-granularity timestamps do not silently miss notes updated within the same second.
+- Rebuilt the normal packaged app and installer after the MCP/live-command changes, producing a fresh `dist\installer\Simple-Sticky-Notes-Setup.exe`.
+- Implemented dropped-file import on the app launch path so dropping `.url` shortcuts or text files onto the desktop/taskbar launcher creates sticky notes from their contents, while non-text drops are copied into `Attachments\` under the Obsidian-backed storage root and linked from the new sticky note.
+- Aligned the repo docs with the current Whitkin MCP project standards by making `STATUS.MD` start with a one-line status, surfacing the canonical tracker files in `README.md`, and documenting the MCP server/registry conventions in `docs/DEVELOPMENT.md`.
 - Initialized the original local project workspace as a git repository.
 - Connected the project repo to `https://github.com/joshwhitk/Simple-Sticky-Notes.git`.
 - Created and pushed the initial local git history to GitHub.
@@ -113,6 +107,14 @@
 - Diagnosed the next installed desktop-launch failure as a packaged resource-path bug: the tray/icon loader still looked for `assets\\icons\\simple-sticky-notes-64.png` beside the installed EXE, but packaged assets live under PyInstaller's `_internal` resource root. Fix applied: packaged resource lookup now uses `sys._MEIPASS` via `resource_root()` for tray/icon assets.
 - Added regression coverage for frozen-mode resource lookup and tray icon loading from the packaged resource root.
 - Rebuilt the installer as `1.0.3`, reinstalled it silently over the local install, and verified the actual desktop `New Simple Sticky Note.lnk` now launches the installed EXE successfully with `--new-note`.
+- Diagnosed the tray-icon interaction bug on Windows: the `pystray` menu handle was present, but left click was a no-op because no default tray action was registered, which made the tray icon feel dead. Fix applied: the custom Win32 tray icon now opens the popup menu on left click as well as right click.
+- Added regression coverage for the Win32 tray icon opening its popup menu on left click.
+- Updated the machine's Obsidian vault path to `C:\Users\Josh\Dropbox\joshs-stuff` and aligned the app's live `settings.json` storage root with `C:\Users\Josh\Dropbox\joshs-stuff\Simple Sticky Notes`.
+- Added an Obsidian-vault-move migration so when the active Obsidian vault changes, the app can move its `Simple Sticky Notes` storage root to the new vault automatically.
+- Added regression coverage for migrating sticky-note storage from one Obsidian vault root to another.
+- Re-ran the full regression checks after the vault-path update: `python -m unittest -v` passed `34` tests and `installer\build.ps1` succeeded.
+- Added a localhost single-instance guard and command-forwarding path so duplicate launches no longer create duplicate tray icons, and re-ran the regression suite at `36` passing tests.
+- Verified the single-instance change packages through a clean staged PyInstaller build; the stock `installer\build.ps1` path is still intermittently blocked by the existing `dist\` workspace lock on this machine.
 
 ### Pri2
 
@@ -143,10 +145,28 @@
 
 - Resume any `lokus` build or evaluation work only if it becomes relevant again.
 - Use Obsidian plugins as a primary sticky-note runtime only if the product requirements are relaxed.
+- Add an optional Obsidian-side control panel only as a companion surface, not as the sticky-note runtime.
+
+### Pri4
+
+- Revisit Microsoft Store distribution only after the desktop app behavior is stable enough to justify another packaging pass.
+- Recover a working Store submission path after the rejected `EXE` attempt and failed local `MSIX` attempt.
+- Revisit Store pricing around USD `$10` only after the packaging and signing path is working again.
+- Keep the Store listing/public messaging in a deferred `coming soon` state until the packaging path is actually usable.
 
 ## Open Questions For Josh
 
 - None currently.
+
+## Testing Status
+
+- Last full regression run: `2026-04-27` `python -m unittest -v` passed `50` tests.
+- Sticky-note service regression run: `2026-04-27` `python -m unittest tests.test_service_api -v` passed `6` tests.
+- Drag-drop regression run: `2026-04-27` `python -m unittest tests.test_cli tests.test_app tests.test_drop_import -v` passed `15` tests.
+- Shared app registry validation: `2026-04-27` `node C:/Users/Josh/Dropbox/code/whitkin-apps/bin/whitkin-apps.js validate` passed.
+- MCP smoke test: `2026-04-27` live stdio client connected and listed `16` tools, including `get_sticky_notes_status`.
+- Installer build status: `2026-04-27` `powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1` succeeded after a transient lock on the previous `dist\Simple Sticky Notes` folder was cleared by renaming that stale directory and rerunning the build.
+- Current bug snapshot: no open in-app bugs are tracked; one external `whitkin-apps` CLI path-with-spaces bug is documented with a manual registry workaround.
 
 ## Resolved Decisions
 
@@ -160,3 +180,4 @@
 - The first Microsoft Store submission should use the current `EXE/MSI` flow because the app already has a working offline installer, a public versioned download URL, and silent-install support; revisit `MSIX` later only if Store-managed packaging becomes worth the migration cost.
 - GitHub release asset URLs are not valid Partner Center package URLs for the `EXE/MSI` flow because they redirect; the Store submission needs a direct HTTPS installer URL plus CA-trusted code signing.
 - For Microsoft Store `EXE/MSI` submissions, use a direct hosted installer URL you control rather than a GitHub release asset URL.
+- Microsoft Store work is no longer an active delivery priority; treat it as deferred distribution work until the core desktop app priorities are done.

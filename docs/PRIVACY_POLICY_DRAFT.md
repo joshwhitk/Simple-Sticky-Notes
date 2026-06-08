@@ -1,5 +1,7 @@
 # Privacy Policy Draft
 
+Status: deferred draft for Microsoft Store work. Keep for later reuse if Store distribution resumes.
+
 Last updated: `2026-04-22`
 
 This draft is intended to become the public privacy policy URL used for the Microsoft Store listing of `Simple Sticky Notes`.

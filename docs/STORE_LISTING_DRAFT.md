@@ -1,5 +1,7 @@
 # Store Listing Draft
 
+Status: deferred. Keep this draft for later reuse if Microsoft Store distribution becomes active again.
+
 This file is paste-ready content for the first Microsoft Store listing of `Simple Sticky Notes`.
 
 ## Core Fields

@@ -1,5 +1,7 @@
 # Microsoft Store Submission
 
+Status: deferred. Keep this file as prior research and draft submission material, not as an active release plan.
+
 This document is the current submission plan for publishing `Simple Sticky Notes` in Microsoft Partner Center.
 
 ## Recommended Product Type

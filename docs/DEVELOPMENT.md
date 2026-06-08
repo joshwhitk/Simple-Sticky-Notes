@@ -35,6 +35,12 @@ Build the packaged app and installer:
 powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1
 ```
 
+Run the stdio MCP server used by other local apps and agents:
+
+```powershell
+node mcp-server/index.js
+```
+
 ## Moving The Repo
 
 The app code is portable across workspace moves because project-relative paths are derived from the current file locations at runtime.
@@ -59,13 +65,17 @@ Current automated coverage includes storage behavior, menu regression cases, run
 
 ## Repo Conventions
 
+- Read order for project health is `STATUS.MD`, then `README.md`, then `bugs.md`, then `regression_tests.md`.
 - Keep `STATUS.MD` updated while working.
 - Log confirmed bugs in `bugs.md`.
 - Add durable tests for repeated bugs in `regression_tests.md` and in code where practical.
 - Prefer straightforward storage formats and inspectable files over opaque state.
+- Keep the shared Whitkin app registry entry accurate when the MCP surface or canonical launch path changes.
+- Keep short summaries in `README.md`; put operational truth in `STATUS.MD` and detail in `docs/`.
 
 ## Next Development Priorities
 
 - Validate the packaged installer end-to-end
 - Add broader multi-monitor and power-event coverage
 - Measure idle resource usage
+- Treat Microsoft Store packaging as deferred distribution work until the core desktop app priorities are done
