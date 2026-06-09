@@ -875,6 +875,10 @@ class StickyNotesApp:
         self.reconcile_storage(refresh_tray=False)
         return self.storage.list_notes()
 
+    def list_recent_notes_for_menu(self, limit: int = 20) -> list[NoteRecord]:
+        self.reconcile_storage(refresh_tray=False)
+        return recent_notes(self.storage.list_notes(), limit)
+
     def reconcile_storage(self, *, refresh_tray: bool = True) -> None:
         self.storage.prune_missing_note_files(protected_note_ids=set(self.windows))
         if refresh_tray:
@@ -1036,6 +1040,18 @@ def split_body_for_images(body: str, is_image: Callable[[str], bool]) -> list[tu
 def join_image_runs(runs: list[tuple[str, str]]) -> str:
     """Reassemble runs from ``split_body_for_images`` back into a markdown body."""
     return "".join(value if kind == "text" else f"![[{value}]]" for kind, value in runs)
+
+
+def recent_notes(notes: list[NoteRecord], limit: int = 20) -> list[NoteRecord]:
+    """The most-recently-created notes first, capped at `limit`.
+
+    created_at is a UTC ISO-8601 timestamp, so a reverse lexical sort is also a
+    reverse chronological sort. note_id breaks ties for a stable order."""
+    return sorted(
+        notes,
+        key=lambda note: (note.metadata.created_at, note.metadata.note_id),
+        reverse=True,
+    )[:limit]
 
 
 def selection_bg_for(bg_color: str) -> str:

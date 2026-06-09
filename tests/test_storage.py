@@ -15,9 +15,11 @@ from simple_sticky_notes.app import (
     join_image_runs,
     note_menu_label,
     persisted_body_from_editor,
+    recent_notes,
     selection_bg_for,
     split_body_for_images,
 )
+from simple_sticky_notes.models import NoteMetadata, NoteRecord
 from simple_sticky_notes.storage import (
     StickyStorage,
     format_note_with_frontmatter,
@@ -305,6 +307,26 @@ class InlineImageRunTests(unittest.TestCase):
         body = "![[a.png]]![[b.png]]x"
         runs = split_body_for_images(body, self._is_image)
         self.assertEqual(runs, [("image", "a.png"), ("image", "b.png"), ("text", "x")])
+
+
+class RecentNotesTests(unittest.TestCase):
+    @staticmethod
+    def _note(note_id: str, created_at: str) -> NoteRecord:
+        meta = NoteMetadata(
+            note_id=note_id, title=note_id, x=0, y=0, width=10, height=10,
+            is_open=True, created_at=created_at, updated_at=created_at,
+        )
+        return NoteRecord(metadata=meta, body="")
+
+    def test_recent_notes_newest_first_and_capped(self) -> None:
+        notes = [self._note(f"n{i}", f"2026-06-{i:02d}T00:00:00+00:00") for i in range(1, 8)]
+        notes = notes[3:] + notes[:3]  # de-order the input
+        result = recent_notes(notes, limit=3)
+        self.assertEqual([n.metadata.note_id for n in result], ["n7", "n6", "n5"])
+
+    def test_recent_notes_handles_fewer_than_limit(self) -> None:
+        notes = [self._note("a", "2026-01-01T00:00:00+00:00")]
+        self.assertEqual(len(recent_notes(notes, limit=20)), 1)
 
 
 if __name__ == "__main__":
