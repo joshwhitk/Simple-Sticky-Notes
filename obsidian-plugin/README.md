@@ -1,8 +1,14 @@
-# Open as Sticky Note — Obsidian plugin
+# Simple Sticky Notes Helper — Obsidian plugin
 
-Adds an **"Open as sticky note"** command, right-click (file-menu) item, and ribbon
-button to Obsidian. Triggering it opens the current note as a real desktop sticky in
-the **Simple Sticky Notes** app.
+Two conveniences for the Simple Sticky Notes workflow:
+
+1. **Open as sticky note** — a command, right-click (file-menu) item, and ribbon
+   button that opens the current note as a real desktop sticky in the **Simple Sticky
+   Notes** app.
+2. **Auto-title new notes** — when an `Untitled` note gets a first line, the plugin
+   renames the file to that line (first 10 words, sanitized to match the desktop app's
+   filename rules). Toggle in the plugin's settings tab. Only ever touches notes still
+   named `Untitled`/`Untitled N`, so it never renames notes you've already named.
 
 ## How it works
 The desktop app listens on a localhost TCP socket (`127.0.0.1:38473`, see

@@ -1,9 +1,9 @@
 {
   "id": "open-as-sticky-note",
-  "name": "Open as Sticky Note",
-  "version": "1.0.0",
+  "name": "Simple Sticky Notes Helper",
+  "version": "1.1.0",
   "minAppVersion": "1.0.0",
-  "description": "Open the current note as a desktop sticky note in Simple Sticky Notes.",
+  "description": "Open a note as a desktop sticky in Simple Sticky Notes, and auto-title new 'Untitled' notes from their first line.",
   "author": "Josh Whitkin",
   "isDesktopOnly": true
 }
