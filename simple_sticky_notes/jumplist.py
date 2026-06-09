@@ -39,7 +39,7 @@ def set_shortcut_app_id(lnk_path: str, app_id: str = APP_USER_MODEL_ID) -> bool:
             shell.CLSID_ShellLink, None, pythoncom.CLSCTX_INPROC_SERVER, shell.IID_IShellLink
         )
         persist = link.QueryInterface(pythoncom.IID_IPersistFile)
-        persist.Load(lnk_path, 0)
+        persist.Load(lnk_path, 0x00000002)  # STGM_READWRITE so the property store is writable
         store = link.QueryInterface(propsys.IID_IPropertyStore)
         store.SetValue(pscon.PKEY_AppUserModel_ID, propsys.PROPVARIANTType(app_id, pythoncom.VT_LPWSTR))
         store.Commit()
