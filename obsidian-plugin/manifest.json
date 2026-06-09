@@ -1,0 +1,9 @@
+{
+  "id": "open-as-sticky-note",
+  "name": "Open as Sticky Note",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Open the current note as a desktop sticky note in Simple Sticky Notes.",
+  "author": "Josh Whitkin",
+  "isDesktopOnly": true
+}

@@ -1,0 +1,17 @@
+{
+  "name": "open-as-sticky-note",
+  "version": "1.0.0",
+  "description": "Open the current Obsidian note as a desktop sticky note in Simple Sticky Notes.",
+  "main": "main.js",
+  "scripts": {
+    "build": "node esbuild.config.mjs"
+  },
+  "keywords": [],
+  "author": "Josh Whitkin",
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "0.23.1",
+    "obsidian": "1.5.7-1",
+    "typescript": "5.4.5"
+  }
+}

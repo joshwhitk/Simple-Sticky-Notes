@@ -148,6 +148,60 @@ class StickyStorage:
     def list_note_ids(self) -> list[str]:
         return sorted(path.stem for path in self.meta_dir.glob("*.json"))
 
+    def find_note_id_for_path(self, path: Path | str) -> str | None:
+        """Return the managed note_id whose markdown file is `path` (matched by
+        filename stem), or None if no sticky tracks that file yet."""
+        path = Path(path)
+        if path.suffix.lower() != ".md":
+            return None
+        stem = path.stem
+        for note_id in self.list_note_ids():
+            metadata = self._load_metadata(note_id)
+            if (metadata.file_stem or note_id) == stem:
+                return note_id
+        return None
+
+    def adopt_note_file(self, path: Path | str) -> str:
+        """Make an existing vault-root markdown file into a managed sticky by
+        creating its sidecar (and adding the stickynote frontmatter, merge-safe).
+        Returns the existing note_id if already tracked."""
+        path = Path(path)
+        existing = self.find_note_id_for_path(path)
+        if existing:
+            return existing
+        body = strip_frontmatter(path.read_text(encoding="utf-8")) if path.exists() else ""
+        note_id = uuid4().hex[:12]
+        now = utc_now_iso()
+        metadata = NoteMetadata(
+            note_id=note_id,
+            title=note_title(body),
+            x=80,
+            y=80,
+            width=self.settings.default_width,
+            height=self.settings.default_height,
+            is_open=True,
+            created_at=now,
+            updated_at=now,
+            file_stem=path.stem,
+        )
+        self.save_metadata(metadata)
+        self.save_note(NoteRecord(metadata=metadata, body=body))
+        return note_id
+
+    def note_id_for_sticky(self, path: Path | str) -> str | None:
+        """Resolve a vault note path to a managed sticky note_id. Adopts the file if
+        it lives in the vault root and isn't tracked yet; returns None for notes the
+        desktop app can't own (non-.md, or files outside the vault root)."""
+        path = Path(path)
+        if path.suffix.lower() != ".md":
+            return None
+        existing = self.find_note_id_for_path(path)
+        if existing:
+            return existing
+        if path.exists() and path.parent.resolve() == self.root.resolve():
+            return self.adopt_note_file(path)
+        return None
+
     def list_notes(self) -> list[NoteRecord]:
         notes: list[NoteRecord] = []
         for note_id in self.list_note_ids():

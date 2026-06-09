@@ -66,6 +66,21 @@ class StickyStorageTests(unittest.TestCase):
         self.assertTrue((attach / "shot.png").exists())
         self.assertTrue((attach / "shot-1.png").exists())
 
+    def test_note_id_for_sticky_adopts_root_note_then_is_idempotent(self) -> None:
+        md = Path(self.tempdir.name) / "Grocery list.md"
+        md.write_text("Grocery list\n- milk\n", encoding="utf-8")
+        note_id = self.storage.note_id_for_sticky(md)
+        self.assertIsNotNone(note_id)
+        # sidecar now exists and the file gained the stickynote tag
+        self.assertTrue((Path(self.tempdir.name) / ".simple-sticky-notes" / "meta" / f"{note_id}.json").exists())
+        self.assertIn("stickynote", md.read_text(encoding="utf-8"))
+        # second call resolves to the SAME note (no duplicate sidecar)
+        self.assertEqual(self.storage.note_id_for_sticky(md), note_id)
+        self.assertEqual(self.storage.load_note(note_id).body.splitlines()[0], "Grocery list")
+
+    def test_note_id_for_sticky_rejects_non_markdown(self) -> None:
+        self.assertIsNone(self.storage.note_id_for_sticky(Path(self.tempdir.name) / "pic.png"))
+
     def test_create_note_persists_markdown_and_metadata(self) -> None:
         note = self.storage.create_note("Test note")
         self.assertTrue((Path(self.tempdir.name) / f"{note.metadata.file_stem}.md").exists())

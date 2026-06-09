@@ -942,6 +942,12 @@ class StickyNotesApp:
             self.show_note(str(payload["note_id"]))
             return
 
+        if command_name == "open-as-sticky":
+            note_id = self.storage.note_id_for_sticky(str(payload["path"]))
+            if note_id:
+                self.show_note(note_id)
+            return
+
         if command_name == "move-resize-note":
             self.move_resize_note(
                 str(payload["note_id"]),

@@ -105,6 +105,13 @@ node mcp-server/index.js
 
 This repo is also registered in the shared Whitkin app registry as `simple-sticky-notes`, with the MCP server as its canonical transport.
 
+### Obsidian "Open as sticky note" plugin
+
+`obsidian-plugin/` is a small Obsidian plugin that adds an **"Open as sticky note"**
+command / right-click item / ribbon button. It tells the running desktop app (via its
+`127.0.0.1:38473` socket) to open the current note as a real sticky window — adopting a
+vault-root note into a sticky if needed. See [`obsidian-plugin/README.md`](obsidian-plugin/README.md).
+
 ### Android companion app
 
 `android/` contains a Kotlin home-screen widget app that reads/writes the **same**
