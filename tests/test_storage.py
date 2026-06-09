@@ -78,6 +78,15 @@ class StickyStorageTests(unittest.TestCase):
         self.assertEqual(self.storage.note_id_for_sticky(md), note_id)
         self.assertEqual(self.storage.load_note(note_id).body.splitlines()[0], "Grocery list")
 
+    def test_phone_home_stems_reads_synced_file(self) -> None:
+        import json as _json
+        self.assertEqual(self.storage.phone_home_stems(), [])  # missing file
+        self.storage.phone_home_path().parent.mkdir(parents=True, exist_ok=True)
+        self.storage.phone_home_path().write_text(
+            _json.dumps({"file_stems": ["Grocery list", "Ideas", "  "]}), encoding="utf-8"
+        )
+        self.assertEqual(self.storage.phone_home_stems(), ["Grocery list", "Ideas"])
+
     def test_note_id_for_sticky_rejects_non_markdown(self) -> None:
         self.assertIsNone(self.storage.note_id_for_sticky(Path(self.tempdir.name) / "pic.png"))
 

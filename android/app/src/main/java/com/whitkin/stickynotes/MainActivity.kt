@@ -102,6 +102,7 @@ class MainActivity : AppCompatActivity() {
         // Scan off the main thread — the vault can hold thousands of files.
         Thread {
             val scanned = try { VaultStore(vault!!).listNotes() } catch (e: Exception) { emptyList() }
+            try { PhoneHome.sync(this@MainActivity) } catch (_: Exception) {}
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 notes = scanned

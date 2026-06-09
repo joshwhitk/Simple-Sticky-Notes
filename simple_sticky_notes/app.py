@@ -879,6 +879,24 @@ class StickyNotesApp:
         self.reconcile_storage(refresh_tray=False)
         return recent_notes(self.storage.list_notes(), limit)
 
+    def show_phone_notes(self) -> None:
+        """Open every sticky note that's on the Android phone's home screen as a
+        desktop sticky (the phone reports them via .simple-sticky-notes/phone-home.json)."""
+        stems = self.storage.phone_home_stems()
+        opened = 0
+        for stem in stems:
+            note_path = self.storage.notes_dir / f"{stem}.md"
+            note_id = self.storage.note_id_for_sticky(note_path)
+            if note_id:
+                self.show_note(note_id)
+                opened += 1
+        if opened == 0:
+            messagebox.showinfo(
+                "Simple Sticky Notes",
+                "No phone sticky notes to show yet.\n\nAdd 'Spawn' widgets on your phone's "
+                "home screen (and let Syncthing sync) — they'll appear here.",
+            )
+
     def reconcile_storage(self, *, refresh_tray: bool = True) -> None:
         self.storage.prune_missing_note_files(protected_note_ids=set(self.windows))
         if refresh_tray:

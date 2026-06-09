@@ -148,6 +148,23 @@ class StickyStorage:
     def list_note_ids(self) -> list[str]:
         return sorted(path.stem for path in self.meta_dir.glob("*.json"))
 
+    def phone_home_path(self) -> Path:
+        return self.internal_dir / "phone-home.json"
+
+    def phone_home_stems(self) -> list[str]:
+        """Filename stems of the notes currently on the Android home screen, as
+        written by the phone app to `.simple-sticky-notes/phone-home.json` (synced
+        via Syncthing). Empty if the phone hasn't reported any."""
+        path = self.phone_home_path()
+        if not path.exists():
+            return []
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return []
+        stems = data.get("file_stems", []) if isinstance(data, dict) else []
+        return [str(stem) for stem in stems if str(stem).strip()]
+
     def find_note_id_for_path(self, path: Path | str) -> str | None:
         """Return the managed note_id whose markdown file is `path` (matched by
         filename stem), or None if no sticky tracks that file yet."""

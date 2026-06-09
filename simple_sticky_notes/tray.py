@@ -89,6 +89,7 @@ class TrayController:
         return (
             pystray.MenuItem("New Sticky", self._schedule(self.app.new_note)),
             pystray.MenuItem("View Sticky Note", pystray.Menu(self._build_recent_submenu)),
+            pystray.MenuItem("Show phone sticky notes", self._schedule(self.app.show_phone_notes)),
             pystray.MenuItem("Notes", pystray.Menu(self._build_notes_submenu)),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Exit", self._schedule(self.app.shutdown)),

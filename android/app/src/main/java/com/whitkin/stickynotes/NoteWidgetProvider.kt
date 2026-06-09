@@ -13,10 +13,12 @@ class NoteWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, mgr: AppWidgetManager, appWidgetIds: IntArray) {
         for (id in appWidgetIds) render(context, mgr, id)
+        PhoneHome.sync(context)
     }
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         for (id in appWidgetIds) Settings.removeWidget(context, id)
+        PhoneHome.sync(context)
     }
 
     companion object {

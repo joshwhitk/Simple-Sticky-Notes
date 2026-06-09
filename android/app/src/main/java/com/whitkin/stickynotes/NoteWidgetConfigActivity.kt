@@ -40,6 +40,7 @@ class NoteWidgetConfigActivity : AppCompatActivity() {
         if (resultCode == Activity.RESULT_OK && path != null) {
             Settings.setWidgetNote(this, appWidgetId, path)
             NoteWidgetProvider.render(this, AppWidgetManager.getInstance(this), appWidgetId)
+            PhoneHome.sync(this)
             setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
         } else {
             setResult(Activity.RESULT_CANCELED)
