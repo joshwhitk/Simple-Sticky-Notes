@@ -48,6 +48,19 @@
                 android:resource="@xml/note_widget_info" />
         </receiver>
 
+        <!-- "Spawn" button widget: one tap creates a new sticky on the home screen. -->
+        <receiver
+            android:name=".SpawnWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_spawn_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/spawn_widget_info" />
+        </receiver>
+
         <!-- Receives the appWidgetId after a successful pin request, to bind it to a note. -->
         <receiver
             android:name=".PinCallbackReceiver"

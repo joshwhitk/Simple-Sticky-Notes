@@ -25,6 +25,8 @@ import java.io.File
 class EditorActivity : AppCompatActivity() {
 
     private var file: File? = null
+    private var pinOnSave = false   // set by the Spawn widget: pin a Sticky Note widget on leave
+    private var pinned = false
     private lateinit var editor: EditText
     private lateinit var vault: File
 
@@ -43,6 +45,7 @@ class EditorActivity : AppCompatActivity() {
         }
         vault = v
 
+        pinOnSave = intent.getBooleanExtra(EXTRA_PIN_ON_SAVE, false)
         intent.getStringExtra(EXTRA_NOTE_PATH)?.let { path ->
             val f = File(path)
             if (f.exists()) {
@@ -120,6 +123,12 @@ class EditorActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         persist()
+        // Spawn flow: once the note actually exists, offer to place a Sticky Note
+        // widget for it on the home screen. Done on leave so it never interrupts typing.
+        if (pinOnSave && !pinned && file != null) {
+            pinned = true
+            WidgetPins.requestPin(this, file!!.absolutePath)
+        }
     }
 
     override fun finish() {

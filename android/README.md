@@ -13,12 +13,14 @@ of the desktop app's `simple_sticky_notes/storage.py`; `FrontmatterTest`
 mirrors the Python test suite to guarantee byte-compatible round-trips.
 
 ## Features
-- **Per-note widget** — resizable home-screen widget showing a note; tap opens a
-  quick editor that saves back (Android widgets can't host inline text fields).
-  Add from the launcher's widget tray (tap the unbound widget to pick a note) or
-  from the app's note list ("Add widget", a per-widget system confirm; capped at 40).
-- **New-note widget** — tap creates a new sticky note, opens the editor, and
-  offers to pin a per-note widget for it.
+Two widgets (both under the app "A New Stickynote" in the widget picker):
+- **Sticky Note** — the per-note widget. Adding it from the picker creates a new
+  sticky note (opens the quick editor) and then displays it; tap to edit, drag off
+  the home screen to remove. Android widgets can't host inline text fields, so it's
+  tap-to-edit.
+- **Spawn** — a persistent button. One tap creates a new sticky note and offers to
+  place a Sticky Note widget for it on the home screen — so a new home-screen sticky
+  is one tap away, no widget-picker browsing needed.
 - **In-app list/editor** — browse notes newest-first, create, edit, delete.
 - **Paste images** — long-press in the editor → Paste (or paste from the keyboard
   clipboard) saves the image to the vault's `_attachments/` folder and inserts an

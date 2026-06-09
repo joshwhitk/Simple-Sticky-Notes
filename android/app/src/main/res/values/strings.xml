@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">A New Stickynote</string>
-    <string name="widget_note_label">Spawn</string>
+    <string name="widget_note_label">Sticky Note</string>
+    <string name="widget_spawn_label">Spawn</string>
     <string name="widget_pick_prompt">Tap to create a sticky note</string>
 </resources>
