@@ -124,6 +124,11 @@ def install_windows_shortcuts() -> dict[str, str]:
         icon,
         startup_spec.working_directory,
     )
+    # Stamp the AppUserModelID so these shortcuts share the app's taskbar Jump List.
+    from . import jumplist
+
+    for path in shortcuts.values():
+        jumplist.set_shortcut_app_id(str(path))
     return {name: str(path) for name, path in shortcuts.items()}
 
 

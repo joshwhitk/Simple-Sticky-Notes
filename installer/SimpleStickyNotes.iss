@@ -23,7 +23,7 @@ OutputBaseFilename=Simple-Sticky-Notes-Setup
 Source: "..\dist\Simple Sticky Notes\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Simple Sticky Notes"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\Simple Sticky Notes"; Filename: "{app}\{#MyAppExeName}"; AppUserModelID: "Whitkin.SimpleStickyNotes"
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-windows-integration"; Flags: runhidden waituntilterminated

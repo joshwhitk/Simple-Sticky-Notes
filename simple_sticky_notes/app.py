@@ -12,6 +12,7 @@ from tkinter import font as tkfont
 from tkinter import messagebox
 from typing import Callable
 
+from . import jumplist
 from .models import NoteRecord
 from .runtime_state import mark_app_launch, mark_clean_shutdown
 from .settings import copy_storage_contents, load_settings, save_settings
@@ -706,15 +707,23 @@ class StickyNotesApp:
         self.root.withdraw()
         self.root.protocol("WM_DELETE_WINDOW", self.shutdown)
         self.tray = TrayController(self)
+        jumplist.set_app_user_model_id()
 
     def attach_instance_server(self, server: InstanceServer) -> None:
         self._instance_server = server
 
-    def run(self, *, create_new_note: bool = False, initial_note_bodies: list[str] | None = None) -> int:
+    def run(
+        self,
+        *,
+        create_new_note: bool = False,
+        initial_note_bodies: list[str] | None = None,
+        startup_command: str | None = None,
+    ) -> int:
         self.session_id, self.previous_shutdown_clean = mark_app_launch()
         self.tray.start()
         self._schedule_command_poll()
         self.reconcile_storage()
+        self._refresh_jumplist()
         open_notes = self.storage.list_open_notes()
         for note in open_notes:
             self.open_note(note)
@@ -723,9 +732,22 @@ class StickyNotesApp:
                 self.create_and_open_note(body=body)
         elif create_new_note:
             self.new_note()
+        if startup_command:
+            self.enqueue_remote_command(startup_command)
 
         self.root.mainloop()
         return 0
+
+    def _refresh_jumplist(self) -> None:
+        """Rebuild the taskbar Jump List with current recent notes (best-effort)."""
+        try:
+            recent = [
+                (note.metadata.title.strip() or note.metadata.note_id[:6], note.metadata.note_id)
+                for note in recent_notes(self.storage.list_notes(), 10)
+            ]
+            jumplist.build_jumplist(recent)
+        except Exception:
+            pass
 
     def new_note(self) -> None:
         self.create_and_open_note()
@@ -947,6 +969,7 @@ class StickyNotesApp:
         self.storage.prune_missing_note_files(protected_note_ids=set(self.windows))
         if refresh_tray:
             self.tray.refresh()
+            self._refresh_jumplist()
 
     def enqueue_remote_command(self, command: str) -> None:
         self._command_queue.put(command)
@@ -1030,6 +1053,14 @@ class StickyNotesApp:
 
         if command_name == "tidy-notes":
             self.tidy_open_notes_to_main_screen()
+            return
+
+        if command_name == "show-phone-notes":
+            self.show_phone_notes()
+            return
+
+        if command_name == "exit":
+            self.shutdown()
             return
 
         if command_name == "open-in-obsidian":
