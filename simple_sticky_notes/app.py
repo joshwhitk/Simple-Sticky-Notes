@@ -28,7 +28,7 @@ CORNER_RADIUS = 4
 EXTERNAL_SYNC_POLL_MS = 1000
 MIN_WIDTH = 180
 MIN_HEIGHT = 120
-DRAG_ZONE_HEIGHT = 28
+DRAG_ZONE_HEIGHT = 10
 RESIZE_HOTSPOT_SIZE = 16
 CLOSE_BUTTON_SIZE = 24
 CLOSE_BUTTON_MARGIN = 6
@@ -97,17 +97,20 @@ class NoteWindow:
         self.drag_zone.bind("<B1-Motion>", self._on_drag_zone_pointer_drag)
         self.drag_zone.bind("<ButtonRelease-1>", self._clear_pointer_state)
 
+        # The body fills the whole note from the top, so the text's own top/bottom
+        # padding gives equal margins. The slim drag strip is lifted above it (below)
+        # so it overlays only the empty top margin — no wasted "title" band.
         self.body = tk.Frame(self.container, bd=0, highlightthickness=0)
         self.body.place(
             x=0,
-            y=DRAG_ZONE_HEIGHT,
+            y=0,
             relwidth=1.0,
             relheight=1.0,
             width=-TEXT_RIGHT_MARGIN,
-            height=-DRAG_ZONE_HEIGHT,
         )
         self.body.bind("<ButtonPress-1>", self._on_body_pointer_down)
         self.body.bind("<ButtonRelease-1>", self._clear_pointer_state)
+        self.drag_zone.lift()  # keep the drag strip clickable above the body
 
         self.close_button = tk.Button(
             self.container,
