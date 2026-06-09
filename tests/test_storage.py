@@ -18,6 +18,7 @@ from simple_sticky_notes.app import (
     recent_notes,
     selection_bg_for,
     split_body_for_images,
+    tile_position,
 )
 from simple_sticky_notes.models import NoteMetadata, NoteRecord
 from simple_sticky_notes.storage import (
@@ -77,6 +78,14 @@ class StickyStorageTests(unittest.TestCase):
         # second call resolves to the SAME note (no duplicate sidecar)
         self.assertEqual(self.storage.note_id_for_sticky(md), note_id)
         self.assertEqual(self.storage.load_note(note_id).body.splitlines()[0], "Grocery list")
+
+    def test_always_on_top_round_trips_in_sidecar(self) -> None:
+        note = self.storage.create_note("Pinned note")
+        self.assertFalse(note.metadata.always_on_top)  # default off
+        note.metadata.always_on_top = True
+        self.storage.save_metadata(note.metadata)
+        reloaded = self.storage.load_note(note.metadata.note_id)
+        self.assertTrue(reloaded.metadata.always_on_top)
 
     def test_phone_home_stems_reads_synced_file(self) -> None:
         import json as _json
@@ -351,6 +360,23 @@ class RecentNotesTests(unittest.TestCase):
     def test_recent_notes_handles_fewer_than_limit(self) -> None:
         notes = [self._note("a", "2026-01-01T00:00:00+00:00")]
         self.assertEqual(len(recent_notes(notes, limit=20)), 1)
+
+
+class TilePositionTests(unittest.TestCase):
+    AREA = (0, 0, 1920, 1080)
+
+    def test_empty_screen_uses_top_left_slot(self) -> None:
+        self.assertEqual(tile_position([], 360, 260, self.AREA, padding=24, gap=16), (24, 24))
+
+    def test_next_note_avoids_overlap(self) -> None:
+        occupied = [(24, 24, 360, 260)]
+        x, y = tile_position(occupied, 360, 260, self.AREA, padding=24, gap=16)
+        self.assertEqual((x, y), (400, 24))  # shifted right past the first note
+        ox, oy, ow, oh = occupied[0]
+        self.assertFalse(x < ox + ow and x + 360 > ox and y < oy + oh and y + 260 > oy)
+
+    def test_cascades_when_area_too_small(self) -> None:
+        self.assertEqual(tile_position([], 360, 260, (0, 0, 100, 100)), (24, 24))
 
 
 if __name__ == "__main__":

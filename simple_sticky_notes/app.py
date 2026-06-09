@@ -154,6 +154,7 @@ class NoteWindow:
 
         self.apply_visual_style()
         self.apply_font_settings()
+        self.apply_always_on_top()
         self._apply_rounded_corners()
         self._position_controls()
         self._last_disk_signature = self._current_disk_signature()
@@ -216,6 +217,17 @@ class NoteWindow:
 
     def apply_font_settings(self) -> None:
         self.text.configure(font=(self.manager.settings.font_family, self.manager.settings.font_size))
+
+    def apply_always_on_top(self) -> None:
+        try:
+            self.window.attributes("-topmost", bool(self.note.metadata.always_on_top))
+        except tk.TclError:
+            pass
+
+    def _toggle_always_on_top(self) -> None:
+        self.note.metadata.always_on_top = bool(self._topmost_var.get())
+        self.apply_always_on_top()
+        self.flush_note()
 
     def set_color(self, color_hex: str) -> None:
         self.note.metadata.bg_color = color_hex
@@ -401,6 +413,14 @@ class NoteWindow:
             notes_menu.add_command(label="(No notes yet)", state="disabled")
         menu.add_cascade(label="Notes", menu=notes_menu)
         menu.add_command(label="New Sticky", command=self.manager.new_note)
+        menu.add_separator()
+
+        self._topmost_var = tk.BooleanVar(value=self.note.metadata.always_on_top)
+        menu.add_checkbutton(
+            label="Keep on top",
+            variable=self._topmost_var,
+            command=self._toggle_always_on_top,
+        )
         menu.add_separator()
 
         color_menu = tk.Menu(menu, tearoff=0)
@@ -714,10 +734,18 @@ class StickyNotesApp:
         self,
         *,
         body: str = "",
-        x: int = 80,
-        y: int = 80,
+        x: int | None = None,
+        y: int | None = None,
         bg_color: str = DEFAULT_NOTE_BG,
     ) -> None:
+        # Tile new notes into a free slot so a spawned sticky never lands on top of
+        # another. An explicit x/y (e.g. split-to-new offset) is honored as given.
+        if x is None or y is None:
+            free_x, free_y = self._find_free_position(
+                self.settings.default_width, self.settings.default_height
+            )
+            x = free_x if x is None else x
+            y = free_y if y is None else y
         title = note_title(body)
         note = self.storage.create_note(
             title=title,
@@ -728,6 +756,24 @@ class StickyNotesApp:
         )
         self.open_note(note)
         return note
+
+    def _find_free_position(self, width: int, height: int) -> tuple[int, int]:
+        occupied: list[tuple[int, int, int, int]] = []
+        for window in self.windows.values():
+            try:
+                if not window.window.winfo_exists():
+                    continue
+                occupied.append(
+                    (
+                        window.window.winfo_x(),
+                        window.window.winfo_y(),
+                        window.window.winfo_width(),
+                        window.window.winfo_height(),
+                    )
+                )
+            except tk.TclError:
+                continue
+        return tile_position(occupied, width, height, main_work_area())
 
     def open_note(self, note: NoteRecord) -> None:
         existing = self.windows.get(note.metadata.note_id)
@@ -951,9 +997,14 @@ class StickyNotesApp:
         if command_name == "new-note":
             body = str(payload.get("body", ""))
             bg_color = str(payload.get("bg_color", DEFAULT_NOTE_BG))
-            x = int(payload.get("x", 80))
-            y = int(payload.get("y", 80))
-            self.create_and_open_note(body=body, x=x, y=y, bg_color=bg_color)
+            raw_x = payload.get("x")
+            raw_y = payload.get("y")
+            self.create_and_open_note(
+                body=body,
+                x=int(raw_x) if raw_x is not None else None,
+                y=int(raw_y) if raw_y is not None else None,
+                bg_color=bg_color,
+            )
             return
 
         if command_name == "show-note":
@@ -1064,6 +1115,39 @@ def split_body_for_images(body: str, is_image: Callable[[str], bool]) -> list[tu
 def join_image_runs(runs: list[tuple[str, str]]) -> str:
     """Reassemble runs from ``split_body_for_images`` back into a markdown body."""
     return "".join(value if kind == "text" else f"![[{value}]]" for kind, value in runs)
+
+
+def tile_position(
+    occupied: list[tuple[int, int, int, int]],
+    width: int,
+    height: int,
+    area: tuple[int, int, int, int],
+    padding: int = 24,
+    gap: int = 16,
+) -> tuple[int, int]:
+    """First grid slot in the work `area` (left, top, right, bottom) where a
+    width×height note doesn't overlap any `occupied` (x, y, w, h) rect. If the
+    screen is full, cascade from the top-left by the note count."""
+    left, top, right, bottom = area
+
+    def overlaps(x: int, y: int) -> bool:
+        for ox, oy, ow, oh in occupied:
+            if x < ox + ow and x + width > ox and y < oy + oh and y + height > oy:
+                return True
+        return False
+
+    step_x = width + gap
+    step_y = height + gap
+    y = top + padding
+    while y + height <= bottom - padding:
+        x = left + padding
+        while x + width <= right - padding:
+            if not overlaps(x, y):
+                return (x, y)
+            x += step_x
+        y += step_y
+    offset = padding + (len(occupied) % 12) * 30
+    return (left + offset, top + offset)
 
 
 def recent_notes(notes: list[NoteRecord], limit: int = 20) -> list[NoteRecord]:

@@ -31,6 +31,7 @@ class NoteMetadata:
     updated_at: str
     bg_color: str = "#ffd54f"
     file_stem: str = ""
+    always_on_top: bool = False
 
 
 @dataclass(slots=True)
