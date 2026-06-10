@@ -29,7 +29,14 @@ EXTERNAL_SYNC_POLL_MS = 1000
 MIN_WIDTH = 180
 MIN_HEIGHT = 120
 DRAG_ZONE_HEIGHT = 10
-RESIZE_HOTSPOT_SIZE = 16
+EDGE_MARGIN = 6  # px from a window edge that grabs a resize handle
+# Tk cursor names that map to the native Windows resize cursors.
+RESIZE_CURSORS = {
+    "n": "size_ns", "s": "size_ns",
+    "e": "size_we", "w": "size_we",
+    "nw": "size_nw_se", "se": "size_nw_se",
+    "ne": "size_ne_sw", "sw": "size_ne_sw",
+}
 CLOSE_BUTTON_SIZE = 24
 CLOSE_BUTTON_MARGIN = 6
 TEXT_RIGHT_MARGIN = CLOSE_BUTTON_SIZE + (CLOSE_BUTTON_MARGIN * 2)
@@ -109,7 +116,9 @@ class NoteWindow:
             width=-TEXT_RIGHT_MARGIN,
         )
         self.body.bind("<ButtonPress-1>", self._on_body_pointer_down)
+        self.body.bind("<B1-Motion>", self._on_body_pointer_drag)
         self.body.bind("<ButtonRelease-1>", self._clear_pointer_state)
+        self.body.bind("<Motion>", self._update_cursor)
         self.drag_zone.lift()  # keep the drag strip clickable above the body
 
         self.close_button = tk.Button(
@@ -503,21 +512,30 @@ class NoteWindow:
         offset_x, offset_y = self._drag_origin
         self.window.geometry(f"+{event.x_root - offset_x}+{event.y_root - offset_y}")
 
-    def _start_resize(self, event: tk.Event) -> None:
+    def _start_resize(self, event: tk.Event, zone: str) -> None:
         self._resize_origin = (
             event.x_root,
             event.y_root,
+            self.window.winfo_x(),
+            self.window.winfo_y(),
             self.window.winfo_width(),
             self.window.winfo_height(),
+            zone,
         )
 
     def _resize(self, event: tk.Event) -> None:
         if not self._resize_origin:
             return
-        start_x, start_y, start_width, start_height = self._resize_origin
-        width = max(MIN_WIDTH, start_width + (event.x_root - start_x))
-        height = max(MIN_HEIGHT, start_height + (event.y_root - start_y))
-        self.window.geometry(f"{width}x{height}+{self.window.winfo_x()}+{self.window.winfo_y()}")
+        start_x, start_y, ox, oy, ow, oh, zone = self._resize_origin
+        x, y, width, height = resize_geometry(
+            zone, ox, oy, ow, oh,
+            event.x_root - start_x, event.y_root - start_y,
+            MIN_WIDTH, MIN_HEIGHT,
+        )
+        self.window.geometry(f"{width}x{height}+{x}+{y}")
+
+    def _edge_zone(self, x: int, y: int) -> str | None:
+        return edge_zone(x, y, self.window.winfo_width(), self.window.winfo_height())
 
     def _apply_rounded_corners(self) -> None:
         hwnd = self.window.winfo_id()
@@ -541,8 +559,9 @@ class NoteWindow:
 
     def _on_container_pointer_down(self, event: tk.Event) -> str | None:
         local_x, local_y = self._local_pointer(event)
-        if self._is_resize_hotspot(local_x, local_y):
-            self._start_resize(event)
+        zone = self._edge_zone(local_x, local_y)
+        if zone:
+            self._start_resize(event, zone)
             return "break"
         if self._is_drag_zone(local_x, local_y):
             return "break"
@@ -556,24 +575,44 @@ class NoteWindow:
         return None
 
     def _on_drag_zone_pointer_down(self, event: tk.Event) -> str | None:
+        local_x, local_y = self._local_pointer(event)
+        zone = self._edge_zone(local_x, local_y)
+        if zone:
+            self._start_resize(event, zone)
+            return "break"
         self._clear_selection()
         self._start_drag(event)
         return "break"
 
     def _on_drag_zone_pointer_drag(self, event: tk.Event) -> str | None:
+        if self._resize_origin:
+            self._resize(event)
+            return "break"
         if self._drag_origin:
             self._drag(event)
             return "break"
         return None
 
-    def _on_body_pointer_down(self, _event: tk.Event) -> str | None:
+    def _on_body_pointer_down(self, event: tk.Event) -> str | None:
+        local_x, local_y = self._local_pointer(event)
+        zone = self._edge_zone(local_x, local_y)
+        if zone:
+            self._start_resize(event, zone)
+            return "break"
         self._focus_editor_for_append()
+        return None
+
+    def _on_body_pointer_drag(self, event: tk.Event) -> str | None:
+        if self._resize_origin:
+            self._resize(event)
+            return "break"
         return None
 
     def _on_text_pointer_down(self, event: tk.Event) -> str | None:
         local_x, local_y = self._local_pointer(event)
-        if self._is_resize_hotspot(local_x, local_y):
-            self._start_resize(event)
+        zone = self._edge_zone(local_x, local_y)
+        if zone:
+            self._start_resize(event, zone)
             return "break"
         return None
 
@@ -594,18 +633,13 @@ class NoteWindow:
     def _is_drag_zone(self, x: int, y: int) -> bool:
         return y <= DRAG_ZONE_HEIGHT and x < (self.window.winfo_width() - CLOSE_BUTTON_SIZE - (CLOSE_BUTTON_MARGIN * 2))
 
-    def _is_resize_hotspot(self, x: int, y: int) -> bool:
-        return (
-            x >= self.window.winfo_width() - RESIZE_HOTSPOT_SIZE
-            and y >= self.window.winfo_height() - RESIZE_HOTSPOT_SIZE
-        )
-
     def _local_pointer(self, event: tk.Event) -> tuple[int, int]:
         return (event.x_root - self.window.winfo_x(), event.y_root - self.window.winfo_y())
 
     def _cursor_for_widget(self, widget: object, x: int, y: int) -> str:
-        if self._is_resize_hotspot(x, y):
-            return "size_nw_se"
+        zone = self._edge_zone(x, y)
+        if zone:
+            return RESIZE_CURSORS[zone]
         if widget == self.drag_zone:
             return "fleur"
         if widget == self.text:
@@ -1182,6 +1216,51 @@ def tile_position(
         y += step_y
     offset = padding + (len(occupied) % 12) * 30
     return (left + offset, top + offset)
+
+
+def edge_zone(x: int, y: int, width: int, height: int, margin: int = EDGE_MARGIN) -> str | None:
+    """Which resize edge/corner a pointer at (x, y) is over, or None for the interior.
+    Returns one of n/s/e/w/nw/ne/sw/se."""
+    left = x <= margin
+    right = x >= width - margin
+    top = y <= margin
+    bottom = y >= height - margin
+    if top and left:
+        return "nw"
+    if top and right:
+        return "ne"
+    if bottom and left:
+        return "sw"
+    if bottom and right:
+        return "se"
+    if top:
+        return "n"
+    if bottom:
+        return "s"
+    if left:
+        return "w"
+    if right:
+        return "e"
+    return None
+
+
+def resize_geometry(
+    zone: str, ox: int, oy: int, ow: int, oh: int, dx: int, dy: int, min_w: int, min_h: int
+) -> tuple[int, int, int, int]:
+    """New (x, y, w, h) when dragging `zone` by (dx, dy) from origin geometry, with
+    the opposite edge pinned. Left/top edges move the corner; minimums clamp in place."""
+    x, y, w, h = ox, oy, ow, oh
+    if "e" in zone:
+        w = max(min_w, ow + dx)
+    if "w" in zone:
+        w = max(min_w, ow - dx)
+        x = ox + (ow - w)
+    if "s" in zone:
+        h = max(min_h, oh + dy)
+    if "n" in zone:
+        h = max(min_h, oh - dy)
+        y = oy + (oh - h)
+    return x, y, w, h
 
 
 def recent_notes(notes: list[NoteRecord], limit: int = 20) -> list[NoteRecord]:

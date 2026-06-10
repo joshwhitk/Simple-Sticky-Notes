@@ -20,6 +20,7 @@ from simple_sticky_notes.app import (
     split_body_for_images,
     tile_position,
 )
+from simple_sticky_notes.app import edge_zone, resize_geometry
 from simple_sticky_notes.models import NoteMetadata, NoteRecord
 from simple_sticky_notes.storage import (
     StickyStorage,
@@ -377,6 +378,36 @@ class TilePositionTests(unittest.TestCase):
 
     def test_cascades_when_area_too_small(self) -> None:
         self.assertEqual(tile_position([], 360, 260, (0, 0, 100, 100)), (24, 24))
+
+
+class EdgeResizeTests(unittest.TestCase):
+    def test_edge_zone_detects_all_regions(self) -> None:
+        W = H = 200
+        self.assertIsNone(edge_zone(100, 100, W, H, margin=6))
+        self.assertEqual(edge_zone(0, 0, W, H, 6), "nw")
+        self.assertEqual(edge_zone(199, 0, W, H, 6), "ne")
+        self.assertEqual(edge_zone(0, 199, W, H, 6), "sw")
+        self.assertEqual(edge_zone(199, 199, W, H, 6), "se")
+        self.assertEqual(edge_zone(100, 1, W, H, 6), "n")
+        self.assertEqual(edge_zone(100, 198, W, H, 6), "s")
+        self.assertEqual(edge_zone(2, 100, W, H, 6), "w")
+        self.assertEqual(edge_zone(197, 100, W, H, 6), "e")
+
+    def test_resize_right_and_bottom_keep_origin(self) -> None:
+        self.assertEqual(resize_geometry("e", 100, 100, 360, 260, 50, 99, 140, 100), (100, 100, 410, 260))
+        self.assertEqual(resize_geometry("s", 100, 100, 360, 260, 99, 40, 140, 100), (100, 100, 360, 300))
+        self.assertEqual(resize_geometry("se", 100, 100, 360, 260, 50, 40, 140, 100), (100, 100, 410, 300))
+
+    def test_resize_left_and_top_move_corner(self) -> None:
+        # dragging the west edge left by 50 grows width and shifts x left
+        self.assertEqual(resize_geometry("w", 100, 100, 360, 260, -50, 0, 140, 100), (50, 100, 410, 260))
+        self.assertEqual(resize_geometry("n", 100, 100, 360, 260, 0, -40, 140, 100), (100, 60, 360, 300))
+        self.assertEqual(resize_geometry("nw", 100, 100, 360, 260, -50, -40, 140, 100), (50, 60, 410, 300))
+
+    def test_resize_clamps_to_minimum_in_place(self) -> None:
+        # shrinking the west edge past the minimum pins width and stops x
+        x, y, w, h = resize_geometry("w", 100, 100, 360, 260, 1000, 0, 140, 100)
+        self.assertEqual((w, x), (140, 100 + 360 - 140))
 
 
 if __name__ == "__main__":
