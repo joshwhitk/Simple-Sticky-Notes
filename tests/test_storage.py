@@ -20,7 +20,7 @@ from simple_sticky_notes.app import (
     split_body_for_images,
     tile_position,
 )
-from simple_sticky_notes.app import edge_zone, resize_geometry
+from simple_sticky_notes.app import edge_zone, resize_geometry, scroll_thumb_extent
 from simple_sticky_notes.models import NoteMetadata, NoteRecord
 from simple_sticky_notes.storage import (
     StickyStorage,
@@ -406,6 +406,21 @@ class EdgeResizeTests(unittest.TestCase):
         # shrinking the west edge past the minimum pins width and stops x
         x, y, w, h = resize_geometry("w", 100, 100, 360, 260, 1000, 0, 140, 100)
         self.assertEqual((w, x), (140, 100 + 360 - 140))
+
+
+class ScrollThumbTests(unittest.TestCase):
+    def test_thumb_is_proportional_to_visible_fraction(self) -> None:
+        self.assertEqual(scroll_thumb_extent(0.0, 0.5, 200, 6), (0.0, 100.0))
+        self.assertEqual(scroll_thumb_extent(0.25, 0.75, 200, 6), (50.0, 150.0))
+
+    def test_tiny_fraction_gets_minimum_thumb(self) -> None:
+        y0, y1 = scroll_thumb_extent(0.0, 0.01, 200, 6)
+        self.assertGreaterEqual(y1 - y0, 6)
+
+    def test_thumb_stays_within_track(self) -> None:
+        y0, y1 = scroll_thumb_extent(0.999, 1.0, 200, 6)
+        self.assertGreaterEqual(y0, 0.0)
+        self.assertLessEqual(y1, 200.0)
 
 
 if __name__ == "__main__":

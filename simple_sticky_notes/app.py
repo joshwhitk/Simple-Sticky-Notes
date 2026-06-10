@@ -37,6 +37,8 @@ RESIZE_CURSORS = {
     "nw": "size_nw_se", "se": "size_nw_se",
     "ne": "size_ne_sw", "sw": "size_ne_sw",
 }
+SCROLLBAR_WIDTH = 6
+SCROLL_THUMB_COLOR = "#8a8a8a"
 CLOSE_BUTTON_SIZE = 24
 CLOSE_BUTTON_MARGIN = 6
 TEXT_RIGHT_MARGIN = CLOSE_BUTTON_SIZE + (CLOSE_BUTTON_MARGIN * 2)
@@ -148,6 +150,14 @@ class NoteWindow:
             exportselection=False,
         )
         self.text.pack(fill="both", expand=True)
+
+        # Thin grey pill scrollbar (no arrows), shown only when content overflows.
+        self.scrollbar = tk.Canvas(self.container, width=SCROLLBAR_WIDTH, highlightthickness=0, bd=0, takefocus=0)
+        self.scrollbar.bind("<Configure>", lambda _e: self._refresh_scrollbar())
+        self.scrollbar.bind("<ButtonPress-1>", self._scroll_to_event)
+        self.scrollbar.bind("<B1-Motion>", self._scroll_to_event)
+        self.text.configure(yscrollcommand=self._on_text_scroll)
+
         self._inline_images: dict[str, str] = {}  # Tk embed name -> markdown filename
         self._image_refs: list[object] = []        # keep PhotoImage refs alive
         self._render_body_into_text(note.body)
@@ -227,6 +237,7 @@ class NoteWindow:
             selectbackground=selection_bg,
             inactiveselectbackground=selection_bg,
         )
+        self.scrollbar.configure(bg=bg_color)
 
     def apply_font_settings(self) -> None:
         self.text.configure(font=(self.manager.settings.font_family, self.manager.settings.font_size))
@@ -658,6 +669,54 @@ class NoteWindow:
 
     def _clear_selection(self) -> None:
         self.text.tag_remove("sel", "1.0", "end")
+
+    # ---- Thin overflow scrollbar (grey pill) ----
+
+    def _on_text_scroll(self, first: str, last: str) -> None:
+        try:
+            first_f, last_f = float(first), float(last)
+        except (TypeError, ValueError):
+            return
+        if first_f <= 0.0 and last_f >= 1.0:
+            self.scrollbar.place_forget()  # everything fits — no scrollbar
+            return
+        top = CLOSE_BUTTON_SIZE + CLOSE_BUTTON_MARGIN + 6  # below the close button
+        self.scrollbar.place(
+            relx=1.0, rely=0.0, x=-(SCROLLBAR_WIDTH + 3), y=top,
+            relheight=1.0, height=-(top + 6), anchor="nw",
+        )
+        self.scrollbar.lift()
+        self._draw_scroll_thumb(first_f, last_f)
+
+    def _draw_scroll_thumb(self, first: float, last: float) -> None:
+        canvas = self.scrollbar
+        canvas.delete("thumb")
+        height = canvas.winfo_height()
+        width = canvas.winfo_width()
+        if height <= 1 or width <= 1:
+            return
+        radius = width / 2
+        y0, y1 = scroll_thumb_extent(first, last, height, width)
+        # A round-capped line of full width renders as a rounded pill.
+        canvas.create_line(
+            width / 2, y0 + radius, width / 2, y1 - radius,
+            width=width, fill=SCROLL_THUMB_COLOR, capstyle="round", tags="thumb",
+        )
+
+    def _refresh_scrollbar(self) -> None:
+        try:
+            first, last = self.text.yview()
+        except tk.TclError:
+            return
+        self._on_text_scroll(first, last)
+
+    def _scroll_to_event(self, event: tk.Event) -> str:
+        height = self.scrollbar.winfo_height()
+        if height > 1:
+            first, last = self.text.yview()
+            span = last - first
+            self.text.yview_moveto(max(0.0, min(1.0, event.y / height - span / 2)))
+        return "break"
 
     def _place_insert_at_append(self) -> None:
         self._clear_selection()
@@ -1257,6 +1316,29 @@ def resize_geometry(
         h = max(min_h, oh - dy)
         y = oy + (oh - h)
     return x, y, w, h
+
+
+def scroll_thumb_extent(
+    first: float, last: float, height: int, width: int
+) -> tuple[float, float]:
+    """Pixel (y0, y1) of the scrollbar thumb for a view spanning fractions
+    [first, last] over a track of `height` px. The thumb is at least `width` tall
+    (so it can render as a circle/pill) and stays within the track."""
+    y0 = first * height
+    y1 = last * height
+    if y1 - y0 < width:
+        mid = (y0 + y1) / 2
+        y0 = mid - width / 2
+        y1 = mid + width / 2
+    # Shift (not shrink) a boundary-hugging thumb back into the track so it keeps
+    # its minimum size at the very top/bottom.
+    if y0 < 0:
+        y1 -= y0
+        y0 = 0.0
+    if y1 > height:
+        y0 -= y1 - height
+        y1 = float(height)
+    return (max(0.0, y0), y1)
 
 
 def recent_notes(notes: list[NoteRecord], limit: int = 20) -> list[NoteRecord]:
