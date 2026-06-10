@@ -381,14 +381,12 @@ class TilePositionTests(unittest.TestCase):
 
 
 class EdgeResizeTests(unittest.TestCase):
-    def test_edge_zone_detects_all_regions(self) -> None:
+    def test_edge_zone_detects_sides_but_not_top(self) -> None:
         W = H = 200
         self.assertIsNone(edge_zone(100, 100, W, H, margin=6))
-        self.assertEqual(edge_zone(0, 0, W, H, 6), "nw")
-        self.assertEqual(edge_zone(199, 0, W, H, 6), "ne")
+        self.assertIsNone(edge_zone(100, 1, W, H, 6))   # top edge is NOT a resize handle
         self.assertEqual(edge_zone(0, 199, W, H, 6), "sw")
         self.assertEqual(edge_zone(199, 199, W, H, 6), "se")
-        self.assertEqual(edge_zone(100, 1, W, H, 6), "n")
         self.assertEqual(edge_zone(100, 198, W, H, 6), "s")
         self.assertEqual(edge_zone(2, 100, W, H, 6), "w")
         self.assertEqual(edge_zone(197, 100, W, H, 6), "e")

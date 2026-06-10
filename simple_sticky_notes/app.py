@@ -513,6 +513,7 @@ class NoteWindow:
         self.window.geometry(f"+{event.x_root - offset_x}+{event.y_root - offset_y}")
 
     def _start_resize(self, event: tk.Event, zone: str) -> None:
+        self._clear_selection()  # don't drag-highlight text while resizing
         self._resize_origin = (
             event.x_root,
             event.y_root,
@@ -533,6 +534,7 @@ class NoteWindow:
             MIN_WIDTH, MIN_HEIGHT,
         )
         self.window.geometry(f"{width}x{height}+{x}+{y}")
+        self._clear_selection()
 
     def _edge_zone(self, x: int, y: int) -> str | None:
         return edge_zone(x, y, self.window.winfo_width(), self.window.winfo_height())
@@ -1220,21 +1222,15 @@ def tile_position(
 
 def edge_zone(x: int, y: int, width: int, height: int, margin: int = EDGE_MARGIN) -> str | None:
     """Which resize edge/corner a pointer at (x, y) is over, or None for the interior.
-    Returns one of n/s/e/w/nw/ne/sw/se."""
+    The TOP edge is intentionally not a resize handle — the top strip is the move
+    target — so this returns one of s/e/w/sw/se."""
     left = x <= margin
     right = x >= width - margin
-    top = y <= margin
     bottom = y >= height - margin
-    if top and left:
-        return "nw"
-    if top and right:
-        return "ne"
     if bottom and left:
         return "sw"
     if bottom and right:
         return "se"
-    if top:
-        return "n"
     if bottom:
         return "s"
     if left:
