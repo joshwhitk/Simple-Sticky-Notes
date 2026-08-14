@@ -10,6 +10,7 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.widget.EditText
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.OnReceiveContentListener
 import androidx.core.view.ViewCompat
@@ -46,6 +47,31 @@ class EditorActivity : AppCompatActivity() {
         vault = v
 
         pinOnSave = intent.getBooleanExtra(EXTRA_PIN_ON_SAVE, false)
+
+        // Back is the deliberate "I'm done" gesture, and it is the last moment this
+        // activity is still the foreground one. That matters: Android drops a pin request
+        // from an app already in the background, so asking from onPause — which is where
+        // the spawn flow used to ask — meant the launcher's "add to home screen" prompt
+        // never appeared and the Spawn widget looked like it did nothing at all.
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                persist()
+                if (pinOnSave && !pinned) {
+                    val f = file
+                    if (f != null) {
+                        pinned = true
+                        WidgetPins.requestPin(this@EditorActivity, f.absolutePath)
+                    } else {
+                        // Nothing typed, so nothing was written. Say so, rather than
+                        // leaving him to wonder what the button did.
+                        Toast.makeText(this@EditorActivity,
+                            "Nothing typed, so no note was spawned.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                isEnabled = false
+                finish()
+            }
+        })
         intent.getStringExtra(EXTRA_NOTE_PATH)?.let { path ->
             val f = File(path)
             if (f.exists()) {
@@ -123,8 +149,9 @@ class EditorActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         persist()
-        // Spawn flow: once the note actually exists, offer to place a Sticky Note
-        // widget for it on the home screen. Done on leave so it never interrupts typing.
+        // Fallback for leaving by Home rather than Back. The platform often refuses a
+        // pin request from here because we are already backgrounded — the reliable path
+        // is the back-press callback in onCreate.
         if (pinOnSave && !pinned && file != null) {
             pinned = true
             WidgetPins.requestPin(this, file!!.absolutePath)
