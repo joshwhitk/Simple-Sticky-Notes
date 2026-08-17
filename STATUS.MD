@@ -1,4 +1,4 @@
-active: Standalone sticky notes work reliably; desktop polish and packaging remain.
+active: Standalone sticky notes work reliably; a Joplin storage backend is in behind a settings flag (default is still files), with the cutover and the Android repoint remaining.
 
 # Status
 
@@ -6,6 +6,7 @@ active: Standalone sticky notes work reliably; desktop polish and packaging rema
 
 ### Pri1
 
+- Finish the Joplin cutover: set `storage_backend` to `joplin` plus `joplin_api_token` in `settings.json`, run `tools\migrate-stickies-to-joplin.py` once, and restart the app. Hold off on daily use until the Android client is repointed at Joplin (or retired), because the phone still reads the vault markdown and would drift once the desktop stops writing it.
 - Manually verify desktop-shortcut and taskbar drag-drop on this PC with real Explorer drops now that the packaged app accepts dropped files and shortcuts.
 - Move a selected note to the right of the current note when chosen from the right-click note list, clamped on-screen.
 - Add `Tidy Onto Main Screen` to the right-click menu so all open notes are moved and resized back onto the primary display.
@@ -32,6 +33,12 @@ active: Standalone sticky notes work reliably; desktop polish and packaging rema
 - Support sketching over sticky-note text with Windows touch or pen input as a deferred enhancement once the core text-note workflow is stable.
 
 ## Completed
+
+### Pri1 (Joplin migration)
+
+- `2026-08-17` Added an optional Joplin storage backend behind a new `storage_backend` setting. Note bodies are read and written through the Joplin Data API against the configured `Simple Sticky Notes` notebook, while window position, size, color, and open state stay in per-device sidecar files under `%APPDATA%\SimpleStickyNotes\joplin-meta`, keyed by the Joplin note id, so they never round-trip through Joplin. The default backend is still `files`, and older `settings.json` files without the new keys keep working with the defaults, so nothing changes for existing installs until the setting is switched.
+- `2026-08-17` Added `tools\migrate-stickies-to-joplin.py`, a rerunnable one-time helper that pairs each file-backend sticky with its already-imported Joplin note by title, creates any note that has no match, and copies the local sidecar metadata over to the new per-device location. It never deletes or edits vault files, and rerunning it skips work already done.
+- `2026-08-17` The Android client is NOT repointed yet: it still reads the Obsidian vault markdown, exactly as flagged in commit `d780aec`. This desktop change is the first half of that coordinated change; the phone half is tracked above under In Progress.
 
 ### Pri0
 
@@ -160,6 +167,7 @@ active: Standalone sticky notes work reliably; desktop polish and packaging rema
 
 ## Testing Status
 
+- Joplin backend regression run: `2026-08-17` `python -m unittest -v` passed `111` tests (`80` before this work, plus new coverage for `JoplinStickyStorage` against a stubbed API, Joplin API retry behavior, settings defaults and backward compatibility, the backend switch, and the migration helper).
 - Last full regression run: `2026-04-27` `python -m unittest -v` passed `50` tests.
 - Sticky-note service regression run: `2026-04-27` `python -m unittest tests.test_service_api -v` passed `6` tests.
 - Drag-drop regression run: `2026-04-27` `python -m unittest tests.test_cli tests.test_app tests.test_drop_import -v` passed `15` tests.

@@ -16,6 +16,10 @@ class AppSettings:
     default_width: int = 360
     default_height: int = 260
     autosave_delay_ms: int = 700
+    storage_backend: str = "files"
+    joplin_api_url: str = "http://100.121.209.20:41185"
+    joplin_api_token: str = ""
+    joplin_notebook: str = "Simple Sticky Notes"
 
 
 @dataclass(slots=True)

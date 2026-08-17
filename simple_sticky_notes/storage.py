@@ -5,9 +5,13 @@ import json
 import re
 from dataclasses import asdict
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from .models import AppSettings, NoteMetadata, NoteRecord, utc_now_iso
+
+if TYPE_CHECKING:
+    from .joplin_storage import JoplinStickyStorage
 
 
 MAX_FILE_STEM_LENGTH = 80
@@ -106,44 +110,10 @@ class StickyStorage:
         return self.root / ATTACHMENTS_DIR_NAME
 
     def save_clipboard_image(self, image, *, stamp: str | None = None) -> str:
-        """Save a PIL image into the vault's _attachments folder as PNG.
-
-        Returns the bare filename to embed as an Obsidian wikilink ``![[name]]``
-        (which resolves by basename anywhere in the vault). Mirrors Obsidian's
-        own ``Pasted image YYYYMMDDHHMMSS.png`` naming, de-duplicated with a
-        ``-N`` suffix.
-        """
-        from datetime import datetime
-
-        attach = self.attachments_dir()
-        attach.mkdir(parents=True, exist_ok=True)
-        stamp = stamp or datetime.now().strftime("%Y%m%d%H%M%S")
-        name = f"{PASTED_IMAGE_PREFIX} {stamp}.png"
-        dest = attach / name
-        counter = 1
-        while dest.exists():
-            name = f"{PASTED_IMAGE_PREFIX} {stamp}-{counter}.png"
-            dest = attach / name
-            counter += 1
-        image.save(str(dest), "PNG")
-        return name
+        return save_image_to_attachments(self.attachments_dir(), image, stamp=stamp)
 
     def import_image_file(self, source: Path | str) -> str:
-        """Copy an existing image file into _attachments; return its filename."""
-        import shutil
-
-        source = Path(source)
-        attach = self.attachments_dir()
-        attach.mkdir(parents=True, exist_ok=True)
-        name = source.name
-        dest = attach / name
-        counter = 1
-        while dest.exists():
-            name = f"{source.stem}-{counter}{source.suffix}"
-            dest = attach / name
-            counter += 1
-        shutil.copy2(str(source), str(dest))
-        return name
+        return import_image_into_attachments(self.attachments_dir(), source)
 
     def list_note_ids(self) -> list[str]:
         return sorted(path.stem for path in self.meta_dir.glob("*.json"))
@@ -155,15 +125,7 @@ class StickyStorage:
         """Filename stems of the notes currently on the Android home screen, as
         written by the phone app to `.simple-sticky-notes/phone-home.json` (synced
         via Syncthing). Empty if the phone hasn't reported any."""
-        path = self.phone_home_path()
-        if not path.exists():
-            return []
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return []
-        stems = data.get("file_stems", []) if isinstance(data, dict) else []
-        return [str(stem) for stem in stems if str(stem).strip()]
+        return read_phone_home_stems(self.phone_home_path())
 
     def find_note_id_for_path(self, path: Path | str) -> str | None:
         """Return the managed note_id whose markdown file is `path` (matched by
@@ -337,6 +299,71 @@ class StickyStorage:
                 if not destination.exists():
                     metadata_path.replace(destination)
             remove_empty_dirs(legacy_meta_dir)
+
+def create_storage(settings: AppSettings) -> "StickyStorage | JoplinStickyStorage":
+    """Build the storage backend the settings ask for.
+
+    'files' (the default) keeps today's markdown-in-vault behavior exactly.
+    'joplin' stores note bodies in Joplin via its Data API while window
+    geometry stays in local per-device sidecars."""
+    if settings.storage_backend == "joplin":
+        from .joplin_storage import JoplinStickyStorage
+
+        return JoplinStickyStorage(settings)
+    return StickyStorage(settings)
+
+
+def save_image_to_attachments(attachments_dir: Path, image, *, stamp: str | None = None) -> str:
+    """Save a PIL image into the vault's _attachments folder as PNG.
+
+    Returns the bare filename to embed as an Obsidian wikilink ``![[name]]``
+    (which resolves by basename anywhere in the vault). Mirrors Obsidian's
+    own ``Pasted image YYYYMMDDHHMMSS.png`` naming, de-duplicated with a
+    ``-N`` suffix.
+    """
+    from datetime import datetime
+
+    attachments_dir.mkdir(parents=True, exist_ok=True)
+    stamp = stamp or datetime.now().strftime("%Y%m%d%H%M%S")
+    name = f"{PASTED_IMAGE_PREFIX} {stamp}.png"
+    dest = attachments_dir / name
+    counter = 1
+    while dest.exists():
+        name = f"{PASTED_IMAGE_PREFIX} {stamp}-{counter}.png"
+        dest = attachments_dir / name
+        counter += 1
+    image.save(str(dest), "PNG")
+    return name
+
+
+def import_image_into_attachments(attachments_dir: Path, source: Path | str) -> str:
+    """Copy an existing image file into _attachments; return its filename."""
+    import shutil
+
+    source = Path(source)
+    attachments_dir.mkdir(parents=True, exist_ok=True)
+    name = source.name
+    dest = attachments_dir / name
+    counter = 1
+    while dest.exists():
+        name = f"{source.stem}-{counter}{source.suffix}"
+        dest = attachments_dir / name
+        counter += 1
+    shutil.copy2(str(source), str(dest))
+    return name
+
+
+def read_phone_home_stems(path: Path) -> list[str]:
+    """Filename stems listed in a phone-home.json file, or [] when absent/bad."""
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    stems = data.get("file_stems", []) if isinstance(data, dict) else []
+    return [str(stem) for stem in stems if str(stem).strip()]
+
 
 def note_title(body: str) -> str:
     collapsed = collapsed_note_text(body)

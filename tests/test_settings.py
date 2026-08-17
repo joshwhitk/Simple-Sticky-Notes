@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
+from dataclasses import asdict
 from pathlib import Path
 from unittest import mock
 
@@ -10,6 +12,42 @@ from simple_sticky_notes import settings as settings_module
 
 
 class SettingsTests(unittest.TestCase):
+    def test_storage_backend_settings_default_to_files(self) -> None:
+        settings = AppSettings(storage_root="anywhere")
+
+        self.assertEqual(settings.storage_backend, "files")
+        self.assertEqual(settings.joplin_api_url, "http://100.121.209.20:41185")
+        self.assertEqual(settings.joplin_api_token, "")
+        self.assertEqual(settings.joplin_notebook, "Simple Sticky Notes")
+
+    def test_settings_file_without_backend_keys_loads_with_defaults(self) -> None:
+        # A settings.json written before the Joplin backend existed has none of
+        # the new keys; loading it must fall back to the 'files' defaults.
+        legacy_data = {
+            "storage_root": "C:\\somewhere\\Simple Sticky Notes",
+            "font_family": "Arial",
+            "font_size": 14,
+            "default_width": 360,
+            "default_height": 260,
+            "autosave_delay_ms": 700,
+        }
+
+        settings = AppSettings(**json.loads(json.dumps(legacy_data)))
+
+        self.assertEqual(settings.storage_backend, "files")
+        self.assertEqual(settings.joplin_notebook, "Simple Sticky Notes")
+
+    def test_backend_settings_round_trip_through_json(self) -> None:
+        settings = AppSettings(
+            storage_root="anywhere",
+            storage_backend="joplin",
+            joplin_api_token="abc123",
+        )
+
+        restored = AppSettings(**json.loads(json.dumps(asdict(settings))))
+
+        self.assertEqual(restored.storage_backend, "joplin")
+        self.assertEqual(restored.joplin_api_token, "abc123")
     def test_copy_storage_contents_copies_nested_files(self) -> None:
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
             source = Path(source_dir)

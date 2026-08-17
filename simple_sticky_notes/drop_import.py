@@ -4,10 +4,14 @@ import configparser
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from .settings import load_settings
-from .storage import StickyStorage
+from .storage import StickyStorage, create_storage
+
+if TYPE_CHECKING:
+    from .joplin_storage import JoplinStickyStorage
 
 
 ATTACHMENTS_DIR_NAME = "Attachments"
@@ -35,11 +39,11 @@ class DroppedNoteContent:
 
 
 def import_dropped_paths(paths: list[str]) -> list[DroppedNoteContent]:
-    storage = StickyStorage(load_settings())
+    storage = create_storage(load_settings())
     return [import_dropped_path(Path(path), storage) for path in paths]
 
 
-def import_dropped_path(path: Path, storage: StickyStorage) -> DroppedNoteContent:
+def import_dropped_path(path: Path, storage: "StickyStorage | JoplinStickyStorage") -> DroppedNoteContent:
     resolved = path.expanduser().resolve()
     url_body = try_read_internet_shortcut(resolved)
     if url_body is not None:
@@ -86,7 +90,7 @@ def try_read_text_drop(path: Path) -> str | None:
     return text
 
 
-def copy_drop_into_obsidian(path: Path, storage: StickyStorage) -> Path:
+def copy_drop_into_obsidian(path: Path, storage: "StickyStorage | JoplinStickyStorage") -> Path:
     attachments_root = storage.root / ATTACHMENTS_DIR_NAME
     attachments_root.mkdir(parents=True, exist_ok=True)
     destination = unique_attachment_path(attachments_root, path.name)

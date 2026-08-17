@@ -17,7 +17,7 @@ from .models import NoteRecord
 from .runtime_state import mark_app_launch, mark_clean_shutdown
 from .settings import copy_storage_contents, load_settings, save_settings
 from .single_instance import InstanceServer
-from .storage import StickyStorage, note_title, strip_frontmatter
+from .storage import create_storage, note_title, strip_frontmatter
 from .tray import TrayController
 from .windows_integration import edit_in_notepad, edit_in_obsidian, show_folder
 
@@ -793,7 +793,7 @@ class NoteWindow:
 class StickyNotesApp:
     def __init__(self) -> None:
         self.settings = load_settings()
-        self.storage = StickyStorage(self.settings)
+        self.storage = create_storage(self.settings)
         self.windows: dict[str, NoteWindow] = {}
         self._is_shutting_down = False
         self._command_queue: Queue[str] = Queue()

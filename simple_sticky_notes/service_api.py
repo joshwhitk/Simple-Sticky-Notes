@@ -2,21 +2,24 @@ from __future__ import annotations
 
 import argparse
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .models import NoteRecord
 from .obsidian_integration import current_obsidian_vault_path
 from .settings import load_settings
 from .single_instance import is_instance_running, send_payload
-from .storage import StickyStorage, note_title
+from .storage import StickyStorage, create_storage, note_title
 from .windows_integration import edit_in_obsidian, show_folder
+
+if TYPE_CHECKING:
+    from .joplin_storage import JoplinStickyStorage
 
 
 PREVIEW_LIMIT = 160
 
 
-def get_storage() -> StickyStorage:
-    return StickyStorage(load_settings())
+def get_storage() -> StickyStorage | JoplinStickyStorage:
+    return create_storage(load_settings())
 
 
 def note_to_dict(note: NoteRecord) -> dict[str, Any]:
