@@ -253,10 +253,17 @@ class JoplinStickyStorageTests(unittest.TestCase):
 
 
 class BackendSwitchTests(unittest.TestCase):
-    def test_create_storage_defaults_to_the_file_backend(self) -> None:
+    def test_create_storage_defaults_to_joplin(self) -> None:
+        # The notes live in Joplin since 2026-08-17; the vault is a frozen archive, so
+        # the default has to point at the live store rather than the dead one.
         with tempfile.TemporaryDirectory() as tempdir:
             storage = create_storage(AppSettings(storage_root=tempdir))
-            self.assertIsInstance(storage, StickyStorage)
+            self.assertIsInstance(storage, JoplinStickyStorage)
+
+    def test_create_storage_still_builds_the_file_backend_on_request(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            settings = AppSettings(storage_root=tempdir, storage_backend="files")
+            self.assertIsInstance(create_storage(settings), StickyStorage)
 
     def test_create_storage_builds_the_joplin_backend_on_request(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

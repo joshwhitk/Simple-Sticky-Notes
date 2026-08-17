@@ -12,17 +12,20 @@ from simple_sticky_notes import settings as settings_module
 
 
 class SettingsTests(unittest.TestCase):
-    def test_storage_backend_settings_default_to_files(self) -> None:
+    def test_storage_backend_settings_default_to_joplin(self) -> None:
+        # Joplin has been the live store since 2026-08-17. Defaulting to files would now
+        # point at a frozen read-only archive and write notes where nothing reads them.
         settings = AppSettings(storage_root="anywhere")
 
-        self.assertEqual(settings.storage_backend, "files")
+        self.assertEqual(settings.storage_backend, "joplin")
         self.assertEqual(settings.joplin_api_url, "http://100.121.209.20:41185")
         self.assertEqual(settings.joplin_api_token, "")
         self.assertEqual(settings.joplin_notebook, "Simple Sticky Notes")
 
     def test_settings_file_without_backend_keys_loads_with_defaults(self) -> None:
-        # A settings.json written before the Joplin backend existed has none of
-        # the new keys; loading it must fall back to the 'files' defaults.
+        # A settings.json written before the Joplin backend existed has none of the new
+        # keys. It must still load, and it now lands on the live store rather than the
+        # archive — an old config file is not a decision to keep using the old storage.
         legacy_data = {
             "storage_root": "C:\\somewhere\\Simple Sticky Notes",
             "font_family": "Arial",
@@ -34,7 +37,7 @@ class SettingsTests(unittest.TestCase):
 
         settings = AppSettings(**json.loads(json.dumps(legacy_data)))
 
-        self.assertEqual(settings.storage_backend, "files")
+        self.assertEqual(settings.storage_backend, "joplin")
         self.assertEqual(settings.joplin_notebook, "Simple Sticky Notes")
 
     def test_backend_settings_round_trip_through_json(self) -> None:

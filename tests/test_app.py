@@ -33,7 +33,7 @@ class AppBehaviorTests(unittest.TestCase):
         self.load_settings_patch = mock.patch.object(
             app_module,
             "load_settings",
-            return_value=AppSettings(storage_root=self.tempdir.name),
+            return_value=AppSettings(storage_root=self.tempdir.name, storage_backend="files"),
         )
         self.save_settings_patch = mock.patch.object(app_module, "save_settings")
         self.copy_storage_patch = mock.patch.object(app_module, "copy_storage_contents")

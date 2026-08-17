@@ -9,9 +9,10 @@ import org.junit.Test
 class BackendSelectionTest {
 
     @Test
-    fun missingBackendSettingMeansFiles() {
-        // Installs that predate the setting have no "backend" pref at all.
-        assertEquals(Stores.BACKEND_FILES, Stores.normalizeBackend(null))
+    fun missingBackendSettingMeansJoplin() {
+        // An install with no "backend" pref is a fresh one, and the notes live in Joplin
+        // since 2026-08-17. Defaulting to files would point it at a frozen archive.
+        assertEquals(Stores.BACKEND_JOPLIN, Stores.normalizeBackend(null))
     }
 
     @Test
@@ -21,10 +22,13 @@ class BackendSelectionTest {
     }
 
     @Test
-    fun unrecognizedValuesFallBackToFiles() {
-        assertEquals(Stores.BACKEND_FILES, Stores.normalizeBackend(""))
-        assertEquals(Stores.BACKEND_FILES, Stores.normalizeBackend("Joplin"))
-        assertEquals(Stores.BACKEND_FILES, Stores.normalizeBackend("dropbox"))
+    fun onlyAnExplicitFilesKeepsTheArchiveBackend() {
+        // Anything unrecognized resolves to the live store rather than the dead one:
+        // a typo should not silently send his notes to a folder nothing reads.
+        assertEquals(Stores.BACKEND_JOPLIN, Stores.normalizeBackend(""))
+        assertEquals(Stores.BACKEND_JOPLIN, Stores.normalizeBackend("Joplin"))
+        assertEquals(Stores.BACKEND_JOPLIN, Stores.normalizeBackend("dropbox"))
+        assertEquals(Stores.BACKEND_FILES, Stores.normalizeBackend("files"))
     }
 
     @Test

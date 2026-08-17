@@ -14,7 +14,7 @@ class ServiceApiTests(unittest.TestCase):
         self.load_settings_patch = mock.patch.object(
             service_api,
             "load_settings",
-            return_value=AppSettings(storage_root=self.tempdir.name),
+            return_value=AppSettings(storage_root=self.tempdir.name, storage_backend="files"),
         )
         self.send_payload_patch = mock.patch.object(service_api, "send_payload", return_value=True)
         self.is_instance_running_patch = mock.patch.object(service_api, "is_instance_running", return_value=True)

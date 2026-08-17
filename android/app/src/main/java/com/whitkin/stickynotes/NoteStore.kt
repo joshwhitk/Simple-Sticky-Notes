@@ -45,11 +45,16 @@ object Stores {
     const val BACKEND_JOPLIN = "joplin"
 
     /**
-     * Missing or unrecognized values mean the files backend, so installs that
-     * predate the setting (and any future typo in it) keep working unchanged.
+     * Unset means Joplin, because that is where the notes are.
+     *
+     * This defaulted to the files backend while the migration was in flight, which was
+     * right then and became wrong on 2026-08-17: the vault it points at is a frozen
+     * read-only archive now, so a fresh install would quietly read an empty folder and
+     * write notes nowhere anybody would ever see them. An explicit "files" is still
+     * honoured — someone who chose it meant it — but silence now means the live store.
      */
     fun normalizeBackend(raw: String?): String =
-        if (raw == BACKEND_JOPLIN) BACKEND_JOPLIN else BACKEND_FILES
+        if (raw == BACKEND_FILES) BACKEND_FILES else BACKEND_JOPLIN
 
     /** Device-local cache of Joplin note bodies; widgets render from it without network. */
     fun joplinCacheDir(ctx: Context): File = File(ctx.filesDir, "joplin-cache")

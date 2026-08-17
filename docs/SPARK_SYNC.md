@@ -1,55 +1,56 @@
 # Spark sync — sticky notes ↔ the Idea Jar
 
-*2026-08-14. The decision and the contract, so the next session doesn't re-derive it.*
+*Written 2026-08-14. Rewritten 2026-08-17, when the Joplin migration landed and made half
+of it wrong.*
 
 ## What a spark sticky is
 
-One spark = **one** sticky note. The note's body is the spark text; each of the jar
-card's notes is folded in below a `---` rule with its date — never as separate stickies.
-Linkage rides in an HTML comment at the end of the body:
+One spark = **one** sticky note. The note's body is the spark text; each of the jar card's
+notes is folded in below a `---` rule with its date — never as separate stickies. Linkage
+rides in an HTML comment at the end of the body:
 
 ```
 <!-- spark:6 card:idea-jar -->
 ```
 
-It survives every round-trip through both sticky apps, renders invisibly in Obsidian and
-on the sticky window, and required **zero changes to this app's code**.
+It survives every round-trip through both sticky apps, renders invisibly, and required
+**no changes to this app's code**. It also survived the migration out of Obsidian intact,
+which is the reason spark↔note linkage still works.
 
-## Where things live (the decision Josh delegated)
+## Where things live
 
-- **Sparks are canonical in Neon** (`sparks` table) — the Idea Factory and both jars
-  already read and write it, and jar-api gives it a network face on the tailnet.
-- **Sticky notes stay as vault markdown + sidecars.** They do NOT migrate into Joplin's
-  database. Reasoning: this app's entire cross-device story is the byte-compatible
-  markdown contract (`storage.py` ↔ `Frontmatter.kt`, mirrored test suites) over the
-  Syncthing-synced vault. Joplin's sqlite is single-app, unreachable from the Android
-  sticky app's sandbox, and adopting it would orphan both existing implementations to
-  gain nothing the vault doesn't already provide. If Joplin visibility is ever wanted,
-  point Joplin at the vault as an external editor the way Obsidian is one today.
+- **Sparks are canonical in Neon** (`sparks` table) — the Idea Factory and both jars read
+  and write it, and jar-api gives it a network face on the tailnet.
+- **Sticky notes live in Joplin**, in the notebook **"Simple Sticky Notes"**, reached
+  through Joplin's Data API on the cloud VM (`http://100.121.209.20:41185`, tailnet-only).
+  Window geometry stays in local per-device sidecars, because where a note sits on *this*
+  screen is not a fact about the note.
+
+> **This document used to argue the opposite.** Until 2026-08-17 it recommended keeping
+> sticky notes as Obsidian vault markdown and explicitly declined Joplin, on the grounds
+> that the byte-compatible markdown contract over Syncthing *was* the sync layer. That was
+> a reasonable call for a vault-based world and it is simply obsolete now: the vault at
+> `C:/Users/Josh/Dropbox/joshs-stuff/` is a frozen read-only archive, and Joplin Server —
+> which the markdown contract was standing in for — does the syncing.
 
 ## The bridge
 
-Lives in the desktop jar's main process (`idea-jar/desktop-jar/lib/sticky.js`) — on the
-machine where the vault lives, which is also the Syncthing hub the phone already syncs
-against.
+Lives in the desktop jar's main process (`idea-jar/desktop-jar/lib/sticky.js`), and talks
+to the same Joplin Data API this app does.
 
-- **Jar → sticky**: the card's work drawer has "push to stickynote". Creates or updates
-  the one note for that spark. New notes are written the way the Android app writes them
-  from outside the desktop app: frontmatter with `title` + `stickynote` tag, plus a
-  `.simple-sticky-notes/meta/<id>.json` sidecar (`is_open: false` — it lists, it does
-  not pop a window). Updates replace the **body only**; existing frontmatter is carried
-  verbatim, exactly like this app's own save.
-- **Sticky → jar**: every 5 minutes the jar scans vault notes carrying the marker. If the
-  text above the first `---` rule differs from Neon, Neon is updated and the jar card's
-  spark line is rewritten — an edit made on the phone's sticky widget shows up on the
-  desktop jar's card.
+- **Jar → sticky**: the card's footer has "push to stickynote". Creates or updates the one
+  note for that spark, in the "Simple Sticky Notes" notebook, then closes the card and asks
+  this app's `service_api` to raise the note's window.
+- **Sticky → jar**: every 5 minutes the jar scans notes in that notebook carrying the
+  marker. If the text above the first `---` rule differs from Neon — compared with
+  whitespace flattened, because Neon stores a spark on one line and a note keeps the
+  wrapping he typed — Neon is updated and the jar card's spark line is rewritten.
+
+The bridge never holds its own copy of the API token: it reads this app's `settings.json`,
+so there is exactly one place on the machine where that token lives.
 
 ## Not built yet
 
-- "Push to stickynote" from the **phone** jar app (needs a jar-api endpoint plus a
-  pending flag the desktop bridge drains — one nullable column away).
-- Tagging an **existing** sticky as a spark from inside this app (planned shape: user
-  adds a `spark` tag; the bridge sees tag-without-marker, creates the Neon row, appends
-  the marker).
-- The VM as a Syncthing peer (its `~/Sync` is empty today) — would let spark stickies
-  flow even with the PC off, and is the natural next resilience step.
+- "Push to stickynote" from the **phone** jar app raises a flag on the card that the
+  desktop bridge drains; the phone never talks to Joplin itself.
+- Tagging an **existing** note as a spark from inside this app.

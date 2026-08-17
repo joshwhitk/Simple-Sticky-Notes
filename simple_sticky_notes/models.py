@@ -16,7 +16,11 @@ class AppSettings:
     default_width: int = 360
     default_height: int = 260
     autosave_delay_ms: int = 700
-    storage_backend: str = "files"
+    # Joplin since the migration on 2026-08-17. This read "files" while the migration was
+    # in flight, which was right then and stopped being safe the moment the vault became a
+    # frozen read-only archive: a machine with no settings.json would write notes into a
+    # dead folder that nothing reads.
+    storage_backend: str = "joplin"
     joplin_api_url: str = "http://100.121.209.20:41185"
     joplin_api_token: str = ""
     joplin_notebook: str = "Simple Sticky Notes"
