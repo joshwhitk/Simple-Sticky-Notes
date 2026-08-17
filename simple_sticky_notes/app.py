@@ -280,8 +280,10 @@ class NoteWindow:
 
     def _on_paste(self, _event: object | None = None) -> str | None:
         """Intercept Ctrl+V / context-menu Paste: if the clipboard holds an image,
-        save it into the vault's _attachments folder and insert an Obsidian embed
-        (``![[name]]``) at the cursor. Otherwise fall through to normal text paste."""
+        hand it to the storage backend (an _attachments file and ``![[name]]``
+        embed on the files backend, a Joplin resource and ``![name](:/id)`` on
+        Joplin) and insert its embed at the cursor. Otherwise fall through to
+        normal text paste."""
         image, files = self._clipboard_images()
         if image is None and not files:
             return None  # not an image — let Tk paste text as usual
@@ -304,7 +306,7 @@ class NoteWindow:
             pass
         for name in names:
             if not self._insert_inline_image(name, "insert"):
-                self.text.insert("insert", f"![[{name}]]")
+                self.text.insert("insert", self.storage.image_embed_text(name))
             self.text.insert("insert", "\n")
         self.flush_note()
         return "break"

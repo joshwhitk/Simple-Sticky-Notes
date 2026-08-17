@@ -3,6 +3,8 @@ package com.whitkin.stickynotes
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 
 /** A note as last seen from Joplin, kept in the device-local cache for widgets and offline reads. */
 data class CachedNote(val id: String, val title: String, val body: String, val modified: Long)
@@ -104,6 +106,19 @@ class JoplinStore(
     /** The cached copy of a note, or null if it has never been seen online. */
     fun cachedNote(key: String): CachedNote? = readCached(cacheDir, key)
 
+    /**
+     * Uploads pasted-image bytes as a Joplin resource and returns the markdown
+     * embed for the note body (`![name](:/id)`). Same "Pasted image <stamp>"
+     * naming as the vault backend's _attachments write, but nothing touches the
+     * vault — it is a frozen archive now. No -N de-dup is needed because every
+     * upload gets its own resource id. Call OFF the main thread.
+     */
+    fun saveImageResource(ext: String, bytes: ByteArray, stamp: String = nowStamp()): String {
+        val name = "Pasted image $stamp.$ext"
+        val id = api.postResource(name, bytes).getString("id")
+        return "![$name](:/$id)"
+    }
+
     // ----- cache -------------------------------------------------------------
 
     private fun cachedFromRemote(remote: JSONObject): CachedNote = CachedNote(
@@ -140,6 +155,9 @@ class JoplinStore(
         fun isJoplinKey(key: String?): Boolean = key?.startsWith(KEY_PREFIX) == true
         fun idOf(key: String): String = key.removePrefix(KEY_PREFIX)
         fun keyOf(id: String): String = KEY_PREFIX + id
+
+        private fun nowStamp(): String =
+            OffsetDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
 
         private fun cacheFile(cacheDir: File, id: String): File = File(cacheDir, "$id.json")
 

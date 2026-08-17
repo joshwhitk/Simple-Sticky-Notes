@@ -115,6 +115,13 @@ class StickyStorage:
     def import_image_file(self, source: Path | str) -> str:
         return import_image_into_attachments(self.attachments_dir(), source)
 
+    def image_embed_text(self, saved: str) -> str:
+        """Body text for a just-saved image: an Obsidian wikilink embed, which
+        resolves by basename anywhere in the vault. (The Joplin backend returns
+        finished markdown from its save methods and overrides this to pass it
+        through.)"""
+        return f"![[{saved}]]"
+
     def list_note_ids(self) -> list[str]:
         return sorted(path.stem for path in self.meta_dir.glob("*.json"))
 

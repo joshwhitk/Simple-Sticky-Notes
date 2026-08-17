@@ -8,7 +8,10 @@ import java.io.IOException
  */
 class FakeJoplinTransport : JoplinTransport {
 
-    data class Recorded(val method: String, val url: String, val body: String?)
+    class Recorded(val method: String, val url: String, val contentType: String?, val bytes: ByteArray?) {
+        /** The body decoded as UTF-8 — right for JSON; multipart assertions can use [bytes]. */
+        val body: String? get() = bytes?.toString(Charsets.UTF_8)
+    }
 
     val requests = ArrayList<Recorded>()
     private val script = ArrayDeque<Any>()  // JoplinHttpResponse or IOException
@@ -17,8 +20,8 @@ class FakeJoplinTransport : JoplinTransport {
     fun enqueue(status: Int, body: String) = enqueue(JoplinHttpResponse(status, body))
     fun enqueueFailure(error: IOException = IOException("connection refused")) = apply { script.addLast(error) }
 
-    override fun execute(method: String, url: String, body: String?): JoplinHttpResponse {
-        requests.add(Recorded(method, url, body))
+    override fun execute(method: String, url: String, contentType: String?, body: ByteArray?): JoplinHttpResponse {
+        requests.add(Recorded(method, url, contentType, body))
         check(script.isNotEmpty()) { "FakeJoplinTransport ran out of scripted responses for $method $url" }
         val next = script.removeFirst()
         if (next is IOException) throw next

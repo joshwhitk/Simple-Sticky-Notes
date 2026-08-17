@@ -79,6 +79,38 @@ class JoplinApiTest {
     }
 
     @Test
+    fun postResourceBuildsAMultipartBodyWithDataAndPropsParts() {
+        val t = FakeJoplinTransport().enqueue(200, """{"id":"res1","title":"shot.png"}""")
+        val created = api(t).postResource("shot.png", byteArrayOf(0x00, -1) + " raw image".toByteArray())
+        assertEquals("res1", created.getString("id"))
+
+        val sent = t.requests[0]
+        assertEquals("POST", sent.method)
+        assertTrue(sent.url, sent.url.startsWith("http://joplin.test:41185/resources?"))
+        assertTrue(sent.url, sent.url.contains("token=tok123"))
+        val contentType = sent.contentType!!
+        assertTrue(contentType, contentType.startsWith("multipart/form-data; boundary="))
+
+        val boundary = contentType.substringAfter("boundary=")
+        val body = sent.body!!
+        assertTrue(body, body.startsWith("--$boundary\r\n"))
+        assertTrue(body, body.contains("Content-Disposition: form-data; name=\"data\"; filename=\"shot.png\"\r\n"))
+        assertTrue(body, body.contains(" raw image"))
+        assertTrue(body, body.contains("Content-Disposition: form-data; name=\"props\"\r\n"))
+        assertTrue(body, body.contains("{\"title\":\"shot.png\"}"))
+        assertTrue(body, body.endsWith("--$boundary--\r\n"))
+    }
+
+    @Test
+    fun postResourceRetriesOnceLikeEveryOtherCall() {
+        val t = FakeJoplinTransport()
+            .enqueueFailure()
+            .enqueue(200, """{"id":"res2"}""")
+        assertEquals("res2", api(t).postResource("x.png", byteArrayOf(1)).getString("id"))
+        assertEquals(2, t.requests.size)
+    }
+
+    @Test
     fun emptyResponseBodyBecomesEmptyObject() {
         val t = FakeJoplinTransport().enqueue(200, "")
         val result = api(t).delete("/notes/abc")

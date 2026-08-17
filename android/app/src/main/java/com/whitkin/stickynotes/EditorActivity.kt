@@ -40,7 +40,7 @@ class EditorActivity : AppCompatActivity() {
     private lateinit var editor: EditText
     private lateinit var store: NoteStore
     private var joplin = false
-    private var vault: File? = null          // still used for pasted-image attachments
+    private var vault: File? = null          // files backend only: pasted images land in _attachments
     private var loadedOk = false             // guards against overwriting a note we failed to load
     private var suppressAutosave = false     // the async load's setText must not trigger a save
     private var saveErrorShown = false       // one toast per offline streak, not one per keystroke
@@ -109,8 +109,9 @@ class EditorActivity : AppCompatActivity() {
             }
         })
 
-        // Accept pasted images (long-press → Paste, or keyboard clipboard): save them
-        // to the vault's _attachments folder and insert an Obsidian ![[name]] embed.
+        // Accept pasted images (long-press → Paste, or keyboard clipboard). Files
+        // backend: saved to the vault's _attachments folder as an Obsidian ![[name]]
+        // embed. Joplin backend: uploaded as a resource and embedded as ![name](:/id).
         ViewCompat.setOnReceiveContentListener(editor, arrayOf("image/*"), imageReceiver)
     }
 
@@ -173,7 +174,7 @@ class EditorActivity : AppCompatActivity() {
         split.second  // hand any non-image (text) content back for normal pasting
     }
 
-    /** Copy an image content-URI into the vault and embed it; returns false if not an image. */
+    /** Store a pasted image under the active backend and embed it; returns false if not an image. */
     private fun insertImageFromUri(uri: Uri): Boolean {
         val type = contentResolver.getType(uri) ?: ""
         if (!type.startsWith("image/")) return false
@@ -183,24 +184,67 @@ class EditorActivity : AppCompatActivity() {
             "image/webp" -> "webp"
             else -> "png"
         }
-        // Attachments live in the vault under either backend (the desktop app does
-        // the same on its Joplin backend), so pasting an image needs the vault folder.
+        val bytes = try {
+            contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        } catch (e: Exception) {
+            null
+        }
+        if (bytes == null) {
+            Toast.makeText(this, "Couldn't read the pasted image.", Toast.LENGTH_LONG).show()
+            return false
+        }
+        if (joplin) {
+            insertImageAsJoplinResource(ext, bytes)
+            return true
+        }
+        // Files backend: attachments live in the vault's _attachments folder, so
+        // this path (and only this path) still needs the vault folder configured.
         val v = vault
         if (v == null) {
             Toast.makeText(this, "Pasting images needs the vault folder — pick it in the app first.", Toast.LENGTH_LONG).show()
             return false
         }
         return try {
-            val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return false
             val name = VaultStore(v).saveAttachment(ext, bytes)
-            val pos = editor.selectionStart.coerceIn(0, editor.text.length)
-            editor.text.insert(pos, "![[$name]]\n")
-            persist()
+            insertEmbedAtCursor("![[$name]]")
             true
         } catch (e: Exception) {
             Toast.makeText(this, "Couldn't paste image: ${e.message}", Toast.LENGTH_LONG).show()
             false
         }
+    }
+
+    /**
+     * Joplin backend: upload the image as a resource on the save worker (it is a
+     * network call, so off the main thread like every other Joplin write), then
+     * embed `![name](:/id)` at the cursor. Offline, the upload fails with the
+     * same toast style as a failed save and the paste is simply dropped —
+     * nothing crashes and no vault folder is involved.
+     */
+    private fun insertImageAsJoplinResource(ext: String, bytes: ByteArray) {
+        saveExecutor.execute {
+            val embed = try {
+                (store as JoplinStore).saveImageResource(ext, bytes)
+            } catch (e: Exception) {
+                runOnUiThread {
+                    if (!isDestroyed) {
+                        Toast.makeText(applicationContext, "Couldn't paste image: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+                return@execute
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                insertEmbedAtCursor(embed)
+            }
+        }
+    }
+
+    /** Inserts an image embed at the cursor and saves, shared by both backends. */
+    private fun insertEmbedAtCursor(embed: String) {
+        val pos = editor.selectionStart.coerceIn(0, editor.text.length)
+        editor.text.insert(pos, "$embed\n")
+        persist()
     }
 
     /** Create-or-update the note from the current text. Silent and safe to call often. */

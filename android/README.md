@@ -35,8 +35,11 @@ Joplin-backend notes on the phone:
   as you keep typing.
 - Cleartext HTTP is allowed only for `100.121.209.20`
   (`res/xml/network_security_config.xml`); any other API host would need HTTPS.
-- Pasted images still go to the vault's `_attachments/` folder (the desktop
-  Joplin backend does the same), so image paste needs the vault folder set.
+- Pasted images upload to Joplin as resources (`POST /resources`, multipart)
+  and are embedded as `![name](:/id)`, matching the desktop Joplin backend.
+  No vault folder is needed on this backend — the retired vault is a frozen
+  read-only archive and nothing writes to it. Offline, the paste shows the
+  usual error toast and is dropped; the note text is unaffected.
 
 ## Compatibility contract (vault-files backend)
 Notes are plain `.md` files in the vault root with merged YAML frontmatter
@@ -58,8 +61,10 @@ Two widgets (both under the app "A New Stickynote" in the widget picker):
   is one tap away, no widget-picker browsing needed.
 - **In-app list/editor** — browse notes newest-first, create, edit, delete.
 - **Paste images** — long-press in the editor → Paste (or paste from the keyboard
-  clipboard) saves the image to the vault's `_attachments/` folder and inserts an
-  Obsidian `![[image]]` embed, matching the desktop app.
+  clipboard). On the Joplin backend the image uploads as a Joplin resource and is
+  embedded as `![name](:/id)`; on the vault-files backend it is saved to the
+  vault's `_attachments/` folder as an Obsidian `![[image]]` embed. Both match
+  the desktop app's behavior on the same backend.
 
 ## Build (Windows)
 Requires the Android SDK (`C:\Users\Josh\Android\Sdk`, platform 34 + build-tools

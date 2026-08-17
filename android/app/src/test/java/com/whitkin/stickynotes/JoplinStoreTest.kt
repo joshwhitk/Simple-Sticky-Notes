@@ -143,6 +143,31 @@ class JoplinStoreTest {
     }
 
     @Test
+    fun saveImageResourceUploadsAndReturnsTheEmbed() {
+        val t = FakeJoplinTransport().enqueue(200, """{"id":"res1","title":"Pasted image 20260817140000.png"}""")
+        val embed = store(t, tmp.newFolder()).saveImageResource("png", byteArrayOf(1, 2, 3), stamp = "20260817140000")
+        assertEquals("![Pasted image 20260817140000.png](:/res1)", embed)
+        val sent = t.requests[0]
+        assertEquals("POST", sent.method)
+        assertTrue(sent.url, sent.url.contains("/resources?"))
+        val contentType = sent.contentType!!
+        assertTrue(contentType, contentType.startsWith("multipart/form-data"))
+        val body = sent.body!!
+        assertTrue(body, body.contains("filename=\"Pasted image 20260817140000.png\""))
+    }
+
+    @Test
+    fun saveImageResourceOfflineRaisesTheUnreachableError() {
+        val t = FakeJoplinTransport().enqueueFailure().enqueueFailure()
+        try {
+            store(t, tmp.newFolder()).saveImageResource("png", byteArrayOf(1))
+            fail("expected JoplinApiError")
+        } catch (e: JoplinApiError) {
+            assertTrue(e.message!!.contains("unreachable"))
+        }
+    }
+
+    @Test
     fun offlineListRaisesTheUnreachableError() {
         val t = FakeJoplinTransport().enqueueFailure().enqueueFailure()
         try {

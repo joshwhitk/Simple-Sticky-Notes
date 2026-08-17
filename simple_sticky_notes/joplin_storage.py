@@ -8,21 +8,23 @@ import urllib.request
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 from .models import AppSettings, NoteMetadata, NoteRecord, utc_now_iso
 from .settings import APP_DATA_DIR
 from .storage import (
     ATTACHMENTS_DIR_NAME,
     HIDDEN_APP_DIR_NAME,
-    import_image_into_attachments,
+    PASTED_IMAGE_PREFIX,
     read_phone_home_stems,
-    save_image_to_attachments,
 )
 
 
 JOPLIN_META_DIR = APP_DATA_DIR / "joplin-meta"
 JOPLIN_PSEUDO_SCHEME = "joplin:"
 NOTE_FIELDS = "id,title,body,user_created_time,user_updated_time"
+# Extensions Joplin renders inline; mirrors INLINE_IMAGE_EXTS in app.py.
+IMAGE_FILE_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
 REQUEST_TIMEOUT_SECONDS = 10
 REQUEST_ATTEMPTS = 2
 RETRY_DELAY_SECONDS = 0.5
@@ -63,12 +65,24 @@ class JoplinApi:
     def delete(self, path: str) -> dict:
         return self._request("DELETE", path)
 
+    def post_resource(self, path: str, *, filename: str, data: bytes, props: dict) -> dict:
+        """POST bytes as a file upload: multipart/form-data with a ``data``
+        file part and a ``props`` JSON part, the shape ``/resources`` expects.
+        Returns the created resource (its ``id`` is what note bodies embed)."""
+        boundary = uuid4().hex
+        body = encode_multipart_resource(boundary, filename=filename, data=data, props=props)
+        headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+        return self._send("POST", path, query=None, body=body, headers=headers)
+
     def _request(self, method: str, path: str, *, query: dict | None = None, payload: dict | None = None) -> dict:
+        body = json.dumps(payload).encode("utf-8") if payload is not None else None
+        headers = {"Content-Type": "application/json"} if body is not None else {}
+        return self._send(method, path, query=query, body=body, headers=headers)
+
+    def _send(self, method: str, path: str, *, query: dict | None, body: bytes | None, headers: dict) -> dict:
         params = {str(key): str(value) for key, value in (query or {}).items()}
         params["token"] = self.token
         url = f"{self.base_url}{path}?{urllib.parse.urlencode(params)}"
-        body = json.dumps(payload).encode("utf-8") if payload is not None else None
-        headers = {"Content-Type": "application/json"} if body is not None else {}
         for attempt in range(1, REQUEST_ATTEMPTS + 1):
             request = urllib.request.Request(url, data=body, headers=headers, method=method)
             try:
@@ -104,8 +118,10 @@ class JoplinStickyStorage:
     API against the configured notebook. Geometry, color, and open state are
     per-device concerns, so they keep the JSON sidecar mechanism relocated to
     the per-user app data dir and never round-trip through Joplin. The vault
-    storage root is still used for pasted-image attachments and the Android
-    phone-home file so those flows keep working unchanged."""
+    storage root is only ever READ under this backend (legacy ``![[name]]``
+    embeds, the Android phone-home file); pasted and imported images become
+    Joplin resources, because the vault is a frozen archive now and nothing
+    may write to it."""
 
     def __init__(
         self,
@@ -203,13 +219,49 @@ class JoplinStickyStorage:
         return self._notebook_id
 
     def attachments_dir(self) -> Path:
+        """The vault's _attachments folder — read-only under this backend, kept
+        so legacy ``![[name]]`` embeds in migrated notes still resolve. New
+        images never land here; they become Joplin resources."""
         return self.root / ATTACHMENTS_DIR_NAME
 
     def save_clipboard_image(self, image, *, stamp: str | None = None) -> str:
-        return save_image_to_attachments(self.attachments_dir(), image, stamp=stamp)
+        """Upload a pasted PIL image as a Joplin resource; return the finished
+        markdown embed (``![name](:/id)``) for the note body. Same naming as
+        the file backend's _attachments write, but nothing touches the vault."""
+        import io
+
+        stamp = stamp or datetime.now().strftime("%Y%m%d%H%M%S")
+        filename = f"{PASTED_IMAGE_PREFIX} {stamp}.png"
+        buffer = io.BytesIO()
+        image.save(buffer, "PNG")
+        return self._embed_uploaded(filename, buffer.getvalue())
 
     def import_image_file(self, source: Path | str) -> str:
-        return import_image_into_attachments(self.attachments_dir(), source)
+        """Upload an existing image file as a Joplin resource; return the
+        finished markdown embed. No de-dup suffix is needed: every upload gets
+        its own resource id, so equal filenames cannot collide."""
+        source = Path(source)
+        return self._embed_uploaded(source.name, source.read_bytes())
+
+    def import_dropped_file(self, source: Path) -> str:
+        """A dropped binary file becomes a Joplin resource and the returned
+        body line references it — images render inline, anything else is a
+        plain link. Folders cannot become a single resource (and the vault may
+        not be written), so they are linked in place instead of copied."""
+        if source.is_dir():
+            return f"Dropped folder (left in place): [{source.name}]({source.as_uri()})"
+        return f"Imported attachment: {self._embed_uploaded(source.name, source.read_bytes())}"
+
+    def image_embed_text(self, saved: str) -> str:
+        """save_clipboard_image/import_image_file already return finished
+        ``![name](:/id)`` markdown, so it goes into the body as-is."""
+        return saved
+
+    def _embed_uploaded(self, filename: str, data: bytes) -> str:
+        created = self.api.post_resource(
+            "/resources", filename=filename, data=data, props={"title": filename}
+        )
+        return resource_embed(filename, str(created["id"]))
 
     def list_note_ids(self) -> list[str]:
         return sorted(str(item["id"]) for item in self._list_remote_notes())
@@ -352,6 +404,33 @@ class JoplinStickyStorage:
         known = len(list(self.meta_dir.glob("*.json"))) if self.meta_dir.exists() else 0
         offset = (known % CASCADE_SLOTS) * CASCADE_STEP
         return (CASCADE_BASE_X + offset, CASCADE_BASE_Y + offset)
+
+
+def resource_embed(filename: str, resource_id: str) -> str:
+    """Markdown that references an uploaded resource. Images get the ``!`` so
+    Joplin renders them inline; any other file renders as a plain link."""
+    bang = "!" if filename.lower().endswith(IMAGE_FILE_SUFFIXES) else ""
+    return f"{bang}[{filename}](:/{resource_id})"
+
+
+def encode_multipart_resource(boundary: str, *, filename: str, data: bytes, props: dict) -> bytes:
+    """Build the multipart/form-data body for a resource upload by hand (the
+    stdlib has no multipart writer): the ``data`` file part carries the raw
+    bytes, the ``props`` part the resource JSON."""
+    head = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="data"; filename="{filename}"\r\n'
+        "Content-Type: application/octet-stream\r\n"
+        "\r\n"
+    ).encode("utf-8")
+    tail = (
+        f"\r\n--{boundary}\r\n"
+        'Content-Disposition: form-data; name="props"\r\n'
+        "\r\n"
+        f"{json.dumps(props)}\r\n"
+        f"--{boundary}--\r\n"
+    ).encode("utf-8")
+    return head + data + tail
 
 
 def iso_from_joplin_ms(value: object) -> str:

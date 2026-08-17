@@ -53,11 +53,23 @@ def import_dropped_path(path: Path, storage: "StickyStorage | JoplinStickyStorag
     if text_body is not None:
         return DroppedNoteContent(source=str(resolved), body=text_body, imported_to_obsidian=False)
 
-    attachment_path = copy_drop_into_obsidian(resolved, storage)
+    body = attachment_drop_body(resolved, storage)
+    return DroppedNoteContent(source=str(resolved), body=body, imported_to_obsidian=True)
+
+
+def attachment_drop_body(path: Path, storage: "StickyStorage | JoplinStickyStorage") -> str:
+    """Capture a binary drop under the active backend and return the body line
+    that references it. Files backend: copy into the vault's Attachments folder,
+    exactly as before. Joplin backend: upload as a resource, because the vault
+    is a frozen archive and must never be written."""
+    from .joplin_storage import JoplinStickyStorage
+
+    if isinstance(storage, JoplinStickyStorage):
+        return storage.import_dropped_file(path)
+    attachment_path = copy_drop_into_obsidian(path, storage)
     relative_target = attachment_path.relative_to(storage.root)
     encoded_target = quote(relative_target.as_posix(), safe="/._-()")
-    body = f"Imported attachment: [{attachment_path.name}]({encoded_target})"
-    return DroppedNoteContent(source=str(resolved), body=body, imported_to_obsidian=True)
+    return f"Imported attachment: [{attachment_path.name}]({encoded_target})"
 
 
 def try_read_internet_shortcut(path: Path) -> str | None:

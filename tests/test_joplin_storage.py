@@ -10,11 +10,14 @@ from urllib.error import HTTPError, URLError
 
 from simple_sticky_notes.models import AppSettings
 from simple_sticky_notes import joplin_storage, service_api
+from simple_sticky_notes.drop_import import import_dropped_path
 from simple_sticky_notes.joplin_storage import (
     JoplinApi,
     JoplinApiError,
     JoplinStickyStorage,
+    encode_multipart_resource,
     iso_from_joplin_ms,
+    resource_embed,
 )
 from simple_sticky_notes.storage import StickyStorage, create_storage
 
@@ -30,6 +33,7 @@ class FakeJoplinApi:
     def __init__(self) -> None:
         self.folders: dict[str, dict] = {}
         self.notes: dict[str, dict] = {}
+        self.resources: list[dict] = []
         self.put_calls = 0
         self._counter = 0
 
@@ -73,6 +77,12 @@ class FakeJoplinApi:
             return {"id": self.add_note(payload["parent_id"], payload["title"], payload["body"])}
         raise AssertionError(f"unexpected POST {path}")
 
+    def post_resource(self, path: str, *, filename: str, data: bytes, props: dict) -> dict:
+        assert path == "/resources", f"unexpected resource POST {path}"
+        resource_id = self._new_id()
+        self.resources.append({"id": resource_id, "filename": filename, "data": data, "props": props})
+        return {"id": resource_id, "title": props.get("title", filename)}
+
     def put(self, path: str, payload: dict) -> dict:
         self.put_calls += 1
         note_id = path.split("/")[2]
@@ -102,6 +112,9 @@ class FakeJoplinApi:
 
 class UnreachableFakeApi:
     def get(self, path: str, **query: object) -> dict:
+        raise JoplinApiError("Joplin is unreachable at http://example.invalid.")
+
+    def post_resource(self, path: str, *, filename: str, data: bytes, props: dict) -> dict:
         raise JoplinApiError("Joplin is unreachable at http://example.invalid.")
 
 
@@ -252,6 +265,103 @@ class JoplinStickyStorageTests(unittest.TestCase):
         self.assertEqual(self.storage.phone_home_stems(), ["Grocery list"])
 
 
+class JoplinImageResourceTests(unittest.TestCase):
+    """Pasted and imported images become Joplin resources — the retired vault
+    is a frozen archive and this backend must never write into it."""
+
+    def setUp(self) -> None:
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.vault = Path(self.tempdir.name) / "vault"
+        self.settings = AppSettings(
+            storage_root=str(self.vault),
+            storage_backend="joplin",
+        )
+        self.api = FakeJoplinApi()
+        self.storage = JoplinStickyStorage(
+            self.settings, api=self.api, meta_dir=Path(self.tempdir.name) / "joplin-meta"
+        )
+
+    def tearDown(self) -> None:
+        self.tempdir.cleanup()
+
+    def assert_vault_untouched(self) -> None:
+        """The vault must not have been created, let alone written into."""
+        self.assertFalse(self.vault.exists())
+
+    def test_save_clipboard_image_uploads_a_resource_and_returns_the_embed(self) -> None:
+        try:
+            from PIL import Image
+        except Exception:
+            self.skipTest("Pillow not installed")
+        img = Image.new("RGB", (4, 4), (255, 213, 79))
+        embed = self.storage.save_clipboard_image(img, stamp="20260817120000")
+        upload = self.api.resources[0]
+        self.assertEqual(upload["filename"], "Pasted image 20260817120000.png")
+        self.assertTrue(upload["data"].startswith(b"\x89PNG"))
+        self.assertEqual(upload["props"], {"title": "Pasted image 20260817120000.png"})
+        self.assertEqual(embed, f"![Pasted image 20260817120000.png](:/{upload['id']})")
+        self.assert_vault_untouched()
+
+    def test_import_image_file_uploads_the_source_bytes(self) -> None:
+        src = Path(self.tempdir.name) / "shot.png"
+        src.write_bytes(b"\x89PNG\r\n\x1a\n fake")
+        embed = self.storage.import_image_file(src)
+        upload = self.api.resources[0]
+        self.assertEqual(upload["filename"], "shot.png")
+        self.assertEqual(upload["data"], b"\x89PNG\r\n\x1a\n fake")
+        self.assertEqual(embed, f"![shot.png](:/{upload['id']})")
+        self.assert_vault_untouched()
+
+    def test_image_embed_text_passes_finished_markdown_through(self) -> None:
+        # Joplin save methods return finished markdown; the files backend wraps
+        # its bare filename in an Obsidian wikilink. Both feed the same paste path.
+        self.assertEqual(self.storage.image_embed_text("![a.png](:/abc)"), "![a.png](:/abc)")
+        with tempfile.TemporaryDirectory() as tempdir:
+            files_storage = StickyStorage(AppSettings(storage_root=tempdir, storage_backend="files"))
+            self.assertEqual(files_storage.image_embed_text("a.png"), "![[a.png]]")
+
+    def test_dropped_image_file_becomes_an_inline_resource_embed(self) -> None:
+        dropped = Path(self.tempdir.name) / "photo.png"
+        dropped.write_bytes(b"\x89PNG\r\n\x1a\n fake")
+        imported = import_dropped_path(dropped, self.storage)
+        upload = self.api.resources[0]
+        self.assertEqual(imported.body, f"Imported attachment: ![photo.png](:/{upload['id']})")
+        self.assertTrue(imported.imported_to_obsidian)
+        self.assert_vault_untouched()
+
+    def test_dropped_binary_file_becomes_a_plain_resource_link(self) -> None:
+        dropped = Path(self.tempdir.name) / "payload.bin"
+        dropped.write_bytes(b"\x00\x01\x02 binary")
+        imported = import_dropped_path(dropped, self.storage)
+        upload = self.api.resources[0]
+        self.assertEqual(upload["data"], b"\x00\x01\x02 binary")
+        self.assertEqual(imported.body, f"Imported attachment: [payload.bin](:/{upload['id']})")
+        self.assert_vault_untouched()
+
+    def test_dropped_folder_is_linked_in_place_not_copied(self) -> None:
+        folder = Path(self.tempdir.name) / "holiday snaps"
+        folder.mkdir()
+        (folder / "one.jpg").write_bytes(b"\x00 jpeg")
+        imported = import_dropped_path(folder, self.storage)
+        self.assertEqual(self.api.resources, [])
+        self.assertIn("Dropped folder (left in place): [holiday snaps](", imported.body)
+        self.assert_vault_untouched()
+
+    def test_unreachable_joplin_surfaces_the_api_error(self) -> None:
+        storage = JoplinStickyStorage(
+            self.settings, api=UnreachableFakeApi(), meta_dir=Path(self.tempdir.name) / "joplin-meta"
+        )
+        src = Path(self.tempdir.name) / "shot.png"
+        src.write_bytes(b"\x89PNG fake")
+        with self.assertRaises(JoplinApiError):
+            storage.import_image_file(src)
+        self.assert_vault_untouched()
+
+    def test_resource_embed_only_inlines_image_extensions(self) -> None:
+        self.assertEqual(resource_embed("a.PNG", "id1"), "![a.PNG](:/id1)")
+        self.assertEqual(resource_embed("report.pdf", "id2"), "[report.pdf](:/id2)")
+
+
 class BackendSwitchTests(unittest.TestCase):
     def test_create_storage_defaults_to_joplin(self) -> None:
         # The notes live in Joplin since 2026-08-17; the vault is a frozen archive, so
@@ -356,6 +466,47 @@ class JoplinApiTransportTests(unittest.TestCase):
                 self.api.get("/notes/nope")
         self.assertEqual(urlopen.call_count, 1)
         self.assertEqual(raised.exception.status, 404)
+
+    def test_post_resource_sends_a_multipart_body_with_data_and_props_parts(self) -> None:
+        with mock.patch.object(
+            joplin_storage.urllib.request, "urlopen", return_value=self._response({"id": "res1"})
+        ) as urlopen:
+            created = self.api.post_resource(
+                "/resources", filename="shot.png", data=b"\x89PNG raw", props={"title": "shot.png"}
+            )
+        self.assertEqual(created, {"id": "res1"})
+        request = urlopen.call_args[0][0]
+        self.assertIn("token=secret-token", request.full_url)
+        content_type = request.get_header("Content-type")
+        self.assertTrue(content_type.startswith("multipart/form-data; boundary="))
+        boundary = content_type.split("boundary=", 1)[1]
+        self.assertIn(f"--{boundary}\r\n".encode("utf-8"), request.data)
+        self.assertIn(b'Content-Disposition: form-data; name="data"; filename="shot.png"\r\n', request.data)
+        self.assertIn(b"\x89PNG raw", request.data)
+        self.assertIn(b'Content-Disposition: form-data; name="props"\r\n', request.data)
+        self.assertIn(json.dumps({"title": "shot.png"}).encode("utf-8"), request.data)
+        self.assertTrue(request.data.endswith(f"--{boundary}--\r\n".encode("utf-8")))
+
+    def test_post_resource_retries_once_like_every_other_call(self) -> None:
+        with mock.patch.object(
+            joplin_storage.urllib.request,
+            "urlopen",
+            side_effect=[URLError("refused"), self._response({"id": "res2"})],
+        ) as urlopen, mock.patch.object(joplin_storage.time, "sleep"):
+            created = self.api.post_resource(
+                "/resources", filename="x.png", data=b"x", props={"title": "x.png"}
+            )
+        self.assertEqual(created, {"id": "res2"})
+        self.assertEqual(urlopen.call_count, 2)
+
+    def test_encode_multipart_resource_keeps_raw_bytes_between_the_parts(self) -> None:
+        body = encode_multipart_resource(
+            "BOUNDARY", filename="a b.png", data=b"\x00\xff raw", props={"title": "a b.png"}
+        )
+        self.assertTrue(body.startswith(b"--BOUNDARY\r\n"))
+        self.assertIn(b'filename="a b.png"', body)
+        self.assertIn(b"\r\n\r\n\x00\xff raw\r\n--BOUNDARY\r\n", body)
+        self.assertTrue(body.endswith(b"--BOUNDARY--\r\n"))
 
     def test_iso_from_joplin_ms_converts_and_defaults(self) -> None:
         self.assertEqual(iso_from_joplin_ms(1755400000000), "2025-08-17T03:06:40+00:00")
