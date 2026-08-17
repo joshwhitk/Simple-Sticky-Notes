@@ -4,18 +4,28 @@ import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
+import android.text.format.DateFormat
+import android.view.View
+import android.view.ViewGroup
+import android.widget.BaseAdapter
+import android.widget.ListView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import java.util.Date
 
 /**
- * Runs when a sticky-note widget is added from the launcher's widget tray.
- * Adding a widget = creating a NEW sticky note: this immediately opens the editor
- * for a fresh note, then binds the resulting note to the widget so it displays the
- * content. If the user writes nothing, the placement is cancelled (no empty widget).
+ * Runs when a sticky-note widget is added from the launcher's widget tray, and asks the
+ * one question that matters: which note?
+ *
+ * It used to skip the question and always create a new note, so there was no way at all
+ * to put an EXISTING sticky on the home screen from the place you would naturally look
+ * for it. The notes you already have are the list now, with "write a new one" at the top.
  */
 class NoteWidgetConfigActivity : AppCompatActivity() {
 
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+    private var notes: List<StickyNote> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,12 +34,45 @@ class NoteWidgetConfigActivity : AppCompatActivity() {
         )
         setResult(Activity.RESULT_CANCELED)  // backing out = widget not placed
 
-        if (Settings.vaultDir(this) == null) {
+        val vault = Settings.vaultDir(this)
+        if (vault == null) {
             Toast.makeText(this, "Open the app and pick your vault folder first.", Toast.LENGTH_LONG).show()
             finish(); return
         }
-        // Adding the widget creates a brand-new sticky note.
+
+        setContentView(R.layout.activity_widget_config)
+        val list = findViewById<ListView>(R.id.config_list)
+        val status = findViewById<TextView>(R.id.config_status)
+        status.text = "Loading your notes…"
+
+        // The vault holds thousands of files; scanning it is not the main thread's job.
+        Thread {
+            val found = try { VaultStore(vault).listNotes() }
+                        catch (e: Exception) { emptyList<StickyNote>() }
+            val scanned = found.sortedByDescending { it.modified }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                notes = scanned
+                status.text = "Which note should this widget show?"
+                list.adapter = Choices()
+                list.setOnItemClickListener { _, _, position, _ ->
+                    if (position == 0) newNote() else bind(notes[position - 1].file.absolutePath)
+                }
+            }
+        }.start()
+    }
+
+    private fun newNote() {
+        @Suppress("DEPRECATION")
         startActivityForResult(Intent(this, EditorActivity::class.java), REQ_NEW_NOTE)
+    }
+
+    private fun bind(path: String) {
+        Settings.setWidgetNote(this, appWidgetId, path)
+        NoteWidgetProvider.render(this, AppWidgetManager.getInstance(this), appWidgetId)
+        PhoneHome.sync(this)
+        setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
+        finish()
     }
 
     @Deprecated("startActivityForResult is fine for this one-shot config handoff")
@@ -37,15 +80,36 @@ class NoteWidgetConfigActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != REQ_NEW_NOTE) return
         val path = data?.getStringExtra(EXTRA_NOTE_PATH)
-        if (resultCode == Activity.RESULT_OK && path != null) {
-            Settings.setWidgetNote(this, appWidgetId, path)
-            NoteWidgetProvider.render(this, AppWidgetManager.getInstance(this), appWidgetId)
-            PhoneHome.sync(this)
-            setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
-        } else {
-            setResult(Activity.RESULT_CANCELED)
+        // Nothing written means no note was created, so there is nothing to show and the
+        // placement is cancelled rather than leaving an empty square on the home screen.
+        if (resultCode == Activity.RESULT_OK && path != null) bind(path)
+        else { setResult(Activity.RESULT_CANCELED); finish() }
+    }
+
+    /** "Write a new one", then every note you already have, most recent first. */
+    private inner class Choices : BaseAdapter() {
+        override fun getCount() = notes.size + 1
+        override fun getItem(p: Int): Any = if (p == 0) "new" else notes[p - 1]
+        override fun getItemId(p: Int) = p.toLong()
+
+        override fun getView(p: Int, convertView: View?, parent: ViewGroup?): View {
+            val v = convertView ?: layoutInflater.inflate(R.layout.row_note, parent, false)
+            val title = v.findViewById<TextView>(R.id.row_title)
+            val date = v.findViewById<TextView>(R.id.row_date)
+            // The row's button belongs to the app's own list, where it puts a note on the
+            // home screen. Here the whole row already IS that choice.
+            v.findViewById<View>(R.id.row_pin).visibility = View.GONE
+
+            if (p == 0) {
+                title.text = "＋  Write a new note"
+                date.text = "opens the editor, then shows it here"
+            } else {
+                val note = notes[p - 1]
+                title.text = note.title
+                date.text = DateFormat.format("MMM d, yyyy", Date(note.modified))
+            }
+            return v
         }
-        finish()
     }
 
     companion object { private const val REQ_NEW_NOTE = 1 }

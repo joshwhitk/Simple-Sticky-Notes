@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the launcher shows for this widget: in the widget tray, and in the confirmation
+  dialog when the app asks to place one.
+
+  Both used to show previewImage, which pointed at @mipmap/ic_launcher — so adding a
+  sticky note offered you the app's icon and nothing that looked like a note at all.
+  A previewLayout is the Android 12+ way to say "it looks like this", and it looks like
+  the real thing because it IS the real thing with sample words in it.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_bg"
+    android:padding="6dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_preview_title"
+        android:textColor="@color/sticky_text"
+        android:textStyle="bold"
+        android:textSize="14sp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:text="@string/widget_preview_body"
+        android:textColor="@color/sticky_text"
+        android:textSize="13sp" />
+</LinearLayout>

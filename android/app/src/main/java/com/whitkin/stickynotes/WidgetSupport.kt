@@ -6,6 +6,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
+import android.widget.RemoteViews
+import java.io.File
 import android.widget.Toast
 
 const val EXTRA_NOTE_PATH = "note_path"
@@ -38,6 +41,36 @@ object WidgetPins {
         var flags = PendingIntent.FLAG_UPDATE_CURRENT
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) flags = flags or PendingIntent.FLAG_MUTABLE
         val pi = PendingIntent.getBroadcast(ctx, notePath.hashCode(), callback, flags)
-        mgr.requestPinAppWidget(provider, null, pi)
+
+        // Show the note itself in the "add to home screen?" dialog. Without this the
+        // launcher falls back to the provider's preview, which used to be the app icon —
+        // so confirming a sticky note meant looking at a picture of the app.
+        var extras: Bundle? = null
+        if (Build.VERSION.SDK_INT >= 33) {
+            runCatching {
+                extras = Bundle().apply {
+                    putParcelable(AppWidgetManager.EXTRA_APPWIDGET_PREVIEW, previewOf(ctx, notePath))
+                }
+            }
+        }
+        mgr.requestPinAppWidget(provider, extras, pi)
+    }
+
+    /** The real note, drawn into the widget's own layout, for the confirmation dialog. */
+    private fun previewOf(ctx: Context, notePath: String): RemoteViews {
+        val views = RemoteViews(ctx.packageName, R.layout.widget_note)
+        val f = File(notePath)
+        var title = f.nameWithoutExtension
+        var body = ""
+        runCatching {
+            val content = f.readText()
+            val (block, raw) = Frontmatter.splitFrontmatter(content)
+            title = Frontmatter.frontmatterTitle(block)
+                ?: Frontmatter.firstNonblankLine(raw) ?: f.nameWithoutExtension
+            body = Frontmatter.bodyWithoutTitleLine(raw, title)
+        }
+        views.setTextViewText(R.id.w_title, title)
+        views.setTextViewText(R.id.w_body, body)
+        return views
     }
 }

@@ -3,4 +3,15 @@
     <string name="widget_note_label">Sticky Note</string>
     <string name="widget_spawn_label">Spawn</string>
     <string name="widget_pick_prompt">Tap to create a sticky note</string>
+
+    <!-- Shown under each widget's name in the launcher's tray. -->
+    <string name="note_widget_desc">One note on your home screen. Pick an existing one or write a new one.</string>
+    <string name="spawn_widget_desc">A button that writes a new sticky note and offers to place it.</string>
+
+    <!-- The words in the widget's preview, so the tray shows something that reads like
+         a note rather than the app icon. -->
+    <string name="widget_preview_title">Milk, bread, tea</string>
+    <string name="widget_preview_body">and the thing I keep forgetting</string>
+
+    <string name="add_to_home">Add to home screen</string>
 </resources>

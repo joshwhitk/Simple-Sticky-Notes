@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The fallback preview, for launchers older than Android 12 that only read previewImage.
+  A yellow note with a turned-up corner and three lines of writing — anything at all that
+  says "sticky note" beats the app icon, which is what was there before.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="72dp"
+    android:height="72dp"
+    android:viewportWidth="72"
+    android:viewportHeight="72">
+
+    <!-- the note, with the bottom-right corner cut away -->
+    <path
+        android:fillColor="#FFFFD54F"
+        android:pathData="M8,8 L64,8 L64,50 L50,64 L8,64 Z" />
+    <!-- the turned-up corner, a shade darker so it reads as a fold -->
+    <path
+        android:fillColor="#FFE0B93C"
+        android:pathData="M64,50 L50,64 L50,50 Z" />
+
+    <!-- three lines of writing -->
+    <path android:fillColor="#FF1F2933" android:pathData="M16,20 L56,20 L56,23 L16,23 Z" />
+    <path android:fillColor="#FF1F2933" android:pathData="M16,30 L56,30 L56,33 L16,33 Z" />
+    <path android:fillColor="#FF1F2933" android:pathData="M16,40 L44,40 L44,43 L16,43 Z" />
+</vector>

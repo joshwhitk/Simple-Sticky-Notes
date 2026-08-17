@@ -9,5 +9,7 @@
     android:resizeMode="none"
     android:widgetCategory="home_screen"
     android:initialLayout="@layout/widget_spawn"
-    android:previewImage="@mipmap/ic_launcher"
+    android:description="@string/spawn_widget_desc"
+    android:previewLayout="@layout/widget_spawn"
+    android:previewImage="@drawable/ic_sticky_preview"
     android:updatePeriodMillis="0" />

@@ -27,10 +27,13 @@
             android:alpha="0.6" />
     </LinearLayout>
 
+    <!-- This puts THIS note on the home screen. It was labelled "New stickynote", which
+         is the one thing it doesn't do — so the only place you could already choose a
+         note to put on the home screen read like a button for making another one. -->
     <Button
         android:id="@+id/row_pin"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="New stickynote"
+        android:text="@string/add_to_home"
         android:textSize="12sp" />
 </LinearLayout>
