@@ -59,15 +59,22 @@ object WidgetPins {
     /** The real note, drawn into the widget's own layout, for the confirmation dialog. */
     private fun previewOf(ctx: Context, notePath: String): RemoteViews {
         val views = RemoteViews(ctx.packageName, R.layout.widget_note)
-        val f = File(notePath)
-        var title = f.nameWithoutExtension
+        var title: String
         var body = ""
-        runCatching {
-            val content = f.readText()
-            val (block, raw) = Frontmatter.splitFrontmatter(content)
-            title = Frontmatter.frontmatterTitle(block)
-                ?: Frontmatter.firstNonblankLine(raw) ?: f.nameWithoutExtension
-            body = Frontmatter.bodyWithoutTitleLine(raw, title)
+        if (JoplinStore.isJoplinKey(notePath)) {
+            val cached = JoplinStore.readCached(Stores.joplinCacheDir(ctx), notePath)
+            title = cached?.title ?: "Sticky note"
+            body = cached?.let { Frontmatter.bodyWithoutTitleLine(it.body, it.title) } ?: ""
+        } else {
+            val f = File(notePath)
+            title = f.nameWithoutExtension
+            runCatching {
+                val content = f.readText()
+                val (block, raw) = Frontmatter.splitFrontmatter(content)
+                title = Frontmatter.frontmatterTitle(block)
+                    ?: Frontmatter.firstNonblankLine(raw) ?: f.nameWithoutExtension
+                body = Frontmatter.bodyWithoutTitleLine(raw, title)
+            }
         }
         views.setTextViewText(R.id.w_title, title)
         views.setTextViewText(R.id.w_body, body)

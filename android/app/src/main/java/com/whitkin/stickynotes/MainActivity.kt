@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var list: ListView
     private lateinit var pathField: EditText
-    private var notes: List<StickyNote> = emptyList()
+    private var notes: List<NoteItem> = emptyList()
 
     private val pickFolder = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
         if (res.resultCode == Activity.RESULT_OK) {
@@ -60,13 +60,26 @@ class MainActivity : AppCompatActivity() {
             if (p.isNotEmpty() && File(p).isDirectory) { Settings.setVaultPath(this, p); refresh() }
             else Toast.makeText(this, "Not a folder: $p", Toast.LENGTH_LONG).show()
         }
+        findViewById<Button>(R.id.btn_backend).setOnClickListener {
+            val next = if (Settings.backend(this) == Stores.BACKEND_JOPLIN) Stores.BACKEND_FILES
+                       else Stores.BACKEND_JOPLIN
+            Settings.setBackend(this, next)
+            refresh()
+        }
+        findViewById<EditText>(R.id.et_joplin_url).setText(Settings.joplinApiUrl(this))
+        findViewById<EditText>(R.id.et_joplin_token).setText(Settings.joplinApiToken(this))
+        findViewById<Button>(R.id.btn_joplin_save).setOnClickListener {
+            Settings.setJoplinApiUrl(this, findViewById<EditText>(R.id.et_joplin_url).text.toString())
+            Settings.setJoplinApiToken(this, findViewById<EditText>(R.id.et_joplin_token).text.toString())
+            refresh()
+        }
         findViewById<Button>(R.id.btn_new).setOnClickListener {
             startActivity(Intent(this, EditorActivity::class.java))
         }
 
         list.setOnItemClickListener { _, _, pos, _ ->
             startActivity(Intent(this, EditorActivity::class.java)
-                .putExtra(EXTRA_NOTE_PATH, notes[pos].file.absolutePath))
+                .putExtra(EXTRA_NOTE_PATH, notes[pos].key))
         }
     }
 
@@ -87,6 +100,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refresh() {
+        val backend = Settings.backend(this)
+        findViewById<Button>(R.id.btn_backend).text =
+            if (backend == Stores.BACKEND_JOPLIN) "Backend: Joplin (tap to switch)"
+            else "Backend: vault files (tap to switch)"
+        findViewById<View>(R.id.joplin_settings).visibility =
+            if (backend == Stores.BACKEND_JOPLIN) View.VISIBLE else View.GONE
+        if (backend == Stores.BACKEND_JOPLIN) refreshJoplin() else refreshFiles()
+    }
+
+    private fun refreshFiles() {
         val vault = Settings.vaultDir(this)
         val storageOk = hasStorage()
         val vaultOk = vault != null && vault.isDirectory
@@ -101,13 +124,44 @@ class MainActivity : AppCompatActivity() {
         status.text = "$base\n… loading notes"
         // Scan off the main thread — the vault can hold thousands of files.
         Thread {
-            val scanned = try { VaultStore(vault!!).listNotes() } catch (e: Exception) { emptyList() }
+            val scanned = try { FileNoteStore(vault!!).listNotes() } catch (e: Exception) { emptyList() }
             try { PhoneHome.sync(this@MainActivity) } catch (_: Exception) {}
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 notes = scanned
                 list.adapter = NotesAdapter()
                 status.text = "$base  (${scanned.size} notes)"
+            }
+        }.start()
+    }
+
+    private fun refreshJoplin() {
+        val base = "✓ Backend: Joplin at ${Settings.joplinApiUrl(this)}"
+        if (Settings.joplinApiToken(this).isEmpty()) {
+            status.text = "$base\n✗ Enter the Joplin API token below"
+            notes = emptyList(); list.adapter = NotesAdapter(); return
+        }
+        status.text = "$base\n… loading notes"
+        // The Data API is a network call — never the main thread's job.
+        Thread {
+            var error: String? = null
+            val scanned = try {
+                Stores.forContext(this@MainActivity)?.listNotes() ?: emptyList()
+            } catch (e: JoplinApiError) {
+                error = e.message; emptyList()
+            } catch (e: Exception) {
+                error = "Joplin request failed: ${e.message}"; emptyList()
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                notes = scanned
+                list.adapter = NotesAdapter()
+                if (error != null) {
+                    status.text = "$base\n✗ $error"
+                    Toast.makeText(this@MainActivity, error, Toast.LENGTH_LONG).show()
+                } else {
+                    status.text = "$base  (${scanned.size} notes)"
+                }
             }
         }.start()
     }
@@ -123,7 +177,7 @@ class MainActivity : AppCompatActivity() {
             v.findViewById<TextView>(R.id.row_date).text =
                 DateFormat.format("MMM d, yyyy", Date(note.modified))
             v.findViewById<Button>(R.id.row_pin).setOnClickListener {
-                WidgetPins.requestPin(this@MainActivity, note.file.absolutePath)
+                WidgetPins.requestPin(this@MainActivity, note.key)
             }
             return v
         }

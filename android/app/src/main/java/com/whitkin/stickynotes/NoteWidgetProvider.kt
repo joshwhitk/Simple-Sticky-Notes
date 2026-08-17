@@ -34,6 +34,17 @@ class NoteWidgetProvider : AppWidgetProvider() {
                     .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
                     .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 views.setOnClickPendingIntent(R.id.w_root, activityPi(ctx, id, cfg))
+            } else if (JoplinStore.isJoplinKey(path)) {
+                // Widgets render on the main thread, so no network here: show the
+                // device-local cached copy, which every list/read/save refreshes.
+                val cached = JoplinStore.readCached(Stores.joplinCacheDir(ctx), path)
+                views.setTextViewText(R.id.w_title, cached?.title ?: "(note not synced yet)")
+                views.setTextViewText(R.id.w_body,
+                    cached?.let { Frontmatter.bodyWithoutTitleLine(it.body, it.title) } ?: "")
+                val edit = Intent(ctx, EditorActivity::class.java)
+                    .putExtra(EXTRA_NOTE_PATH, path)
+                    .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                views.setOnClickPendingIntent(R.id.w_root, activityPi(ctx, id, edit))
             } else {
                 val f = File(path)
                 var title = f.nameWithoutExtension

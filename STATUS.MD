@@ -1,4 +1,4 @@
-active: Standalone sticky notes work reliably; a Joplin storage backend is in behind a settings flag (default is still files), with the cutover and the Android repoint remaining.
+active: Standalone sticky notes work reliably; both the desktop and Android apps now have a Joplin storage backend behind a settings flag (default is still files), with only the cutover itself remaining.
 
 # Status
 
@@ -6,7 +6,7 @@ active: Standalone sticky notes work reliably; a Joplin storage backend is in be
 
 ### Pri1
 
-- Finish the Joplin cutover: set `storage_backend` to `joplin` plus `joplin_api_token` in `settings.json`, run `tools\migrate-stickies-to-joplin.py` once, and restart the app. Hold off on daily use until the Android client is repointed at Joplin (or retired), because the phone still reads the vault markdown and would drift once the desktop stops writing it.
+- Finish the Joplin cutover: on the desktop, set `storage_backend` to `joplin` plus `joplin_api_token` in `settings.json`, run `tools\migrate-stickies-to-joplin.py` once, and restart the app; on the phone, flip the in-app backend toggle to Joplin and enter the same token (it lives on the VM in `/etc/agent-creds.env` as `JOPLIN_DATA_API_TOKEN`). Both halves are now built; do them together so the two apps stop drifting.
 - Manually verify desktop-shortcut and taskbar drag-drop on this PC with real Explorer drops now that the packaged app accepts dropped files and shortcuts.
 - Move a selected note to the right of the current note when chosen from the right-click note list, clamped on-screen.
 - Add `Tidy Onto Main Screen` to the right-click menu so all open notes are moved and resized back onto the primary display.
@@ -39,6 +39,8 @@ active: Standalone sticky notes work reliably; a Joplin storage backend is in be
 - `2026-08-17` Added an optional Joplin storage backend behind a new `storage_backend` setting. Note bodies are read and written through the Joplin Data API against the configured `Simple Sticky Notes` notebook, while window position, size, color, and open state stay in per-device sidecar files under `%APPDATA%\SimpleStickyNotes\joplin-meta`, keyed by the Joplin note id, so they never round-trip through Joplin. The default backend is still `files`, and older `settings.json` files without the new keys keep working with the defaults, so nothing changes for existing installs until the setting is switched.
 - `2026-08-17` Added `tools\migrate-stickies-to-joplin.py`, a rerunnable one-time helper that pairs each file-backend sticky with its already-imported Joplin note by title, creates any note that has no match, and copies the local sidecar metadata over to the new per-device location. It never deletes or edits vault files, and rerunning it skips work already done.
 - `2026-08-17` The Android client is NOT repointed yet: it still reads the Obsidian vault markdown, exactly as flagged in commit `d780aec`. This desktop change is the first half of that coordinated change; the phone half is tracked above under In Progress.
+- `2026-08-17` Android now has the matching Joplin backend behind an in-app toggle (main screen: "Backend: vault files / Joplin", plus API URL and token fields shown when Joplin is selected; default is still vault files, and installs without the new settings behave exactly as before). It follows the desktop `joplin_storage.py` conventions: Data API at the tailnet URL with token query auth, notes in the "Simple Sticky Notes" notebook found-or-created via paged `/folders`, note identity = the Joplin note id carried as a `joplin:<id>` key through the same intent/widget plumbing that used file paths, and only title+body round-tripping. All API calls run off the main thread with a 10s timeout and one retry; offline the list degrades to empty with a visible error status and toast, and the editor falls back to a device-local cache (`files/joplin-cache/`) that also feeds the home-screen widgets, which cannot use the network. Cleartext HTTP is scoped to `100.121.209.20` only via a network security config. The vault-files backend and its on-disk format are untouched.
+- `2026-08-17` Android cutover procedure: flip the backend toggle to Joplin and enter the API token (on the VM in `/etc/agent-creds.env` as `JOPLIN_DATA_API_TOKEN` — referenced, never committed). Verified by `gradlew test` (33 unit tests passing per variant: the 9 existing Frontmatter tests plus 24 new ones covering the Joplin store against a fake transport, API retry/error behavior, settings backward compatibility, and the backend switch) and `assembleDebug` producing `simple-sticky-notes-1.9-debug.apk`.
 
 ### Pri0
 

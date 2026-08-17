@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Joplin Data API on the tailnet is plain HTTP; allow cleartext for that
+     one host only. Everything else keeps the platform default (no cleartext). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">100.121.209.20</domain>
+    </domain-config>
+</network-security-config>

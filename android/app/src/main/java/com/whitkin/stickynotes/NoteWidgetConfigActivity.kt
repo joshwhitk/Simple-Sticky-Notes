@@ -25,7 +25,7 @@ import java.util.Date
 class NoteWidgetConfigActivity : AppCompatActivity() {
 
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
-    private var notes: List<StickyNote> = emptyList()
+    private var notes: List<NoteItem> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,8 +34,8 @@ class NoteWidgetConfigActivity : AppCompatActivity() {
         )
         setResult(Activity.RESULT_CANCELED)  // backing out = widget not placed
 
-        val vault = Settings.vaultDir(this)
-        if (vault == null) {
+        val store = Stores.forContext(this)
+        if (store == null) {
             Toast.makeText(this, "Open the app and pick your vault folder first.", Toast.LENGTH_LONG).show()
             finish(); return
         }
@@ -45,18 +45,24 @@ class NoteWidgetConfigActivity : AppCompatActivity() {
         val status = findViewById<TextView>(R.id.config_status)
         status.text = "Loading your notes…"
 
-        // The vault holds thousands of files; scanning it is not the main thread's job.
+        // Vault scans and Joplin API calls alike are not the main thread's job.
         Thread {
-            val found = try { VaultStore(vault).listNotes() }
-                        catch (e: Exception) { emptyList<StickyNote>() }
+            var error: String? = null
+            val found = try { store.listNotes() }
+                        catch (e: JoplinApiError) { error = e.message; emptyList() }
+                        catch (e: Exception) { emptyList<NoteItem>() }
             val scanned = found.sortedByDescending { it.modified }
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 notes = scanned
-                status.text = "Which note should this widget show?"
+                status.text = if (error != null) {
+                    "$error Only 'write a new note' will work right now."
+                } else {
+                    "Which note should this widget show?"
+                }
                 list.adapter = Choices()
                 list.setOnItemClickListener { _, _, position, _ ->
-                    if (position == 0) newNote() else bind(notes[position - 1].file.absolutePath)
+                    if (position == 0) newNote() else bind(notes[position - 1].key)
                 }
             }
         }.start()
@@ -67,8 +73,8 @@ class NoteWidgetConfigActivity : AppCompatActivity() {
         startActivityForResult(Intent(this, EditorActivity::class.java), REQ_NEW_NOTE)
     }
 
-    private fun bind(path: String) {
-        Settings.setWidgetNote(this, appWidgetId, path)
+    private fun bind(key: String) {
+        Settings.setWidgetNote(this, appWidgetId, key)
         NoteWidgetProvider.render(this, AppWidgetManager.getInstance(this), appWidgetId)
         PhoneHome.sync(this)
         setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))

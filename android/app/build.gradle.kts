@@ -11,8 +11,8 @@ android {
         applicationId = "com.whitkin.stickynotes"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "1.8"
+        versionCode = 10
+        versionName = "1.9"
     }
 
     buildTypes {
@@ -48,4 +48,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     testImplementation("junit:junit:4.13.2")
+    // Real org.json for local unit tests (the android.jar stubs throw), so the
+    // Joplin store and API client can be tested against a fake transport.
+    testImplementation("org.json:json:20240303")
 }
