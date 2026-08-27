@@ -11,6 +11,11 @@
 
 ## Results
 
+- On `2026-08-17`, `python -m unittest -v` passed `124` tests and `installer\build.ps1` produced a fresh `dist\installer\Simple-Sticky-Notes-Setup.exe`, after the tray was cut back to a single note selector and the last Syncthing references were removed:
+  - the tray offered **three** ways to reach a note — "View Sticky Note" (20 most recent), "Notes" (all of them), and "Show phone sticky notes". The first two were the same list at different lengths; the third resolved notes by `.md` stem and so stopped working entirely when the notes moved to Joplin, failing into a dialog that told the user to wait for Syncthing. One "Notes" submenu remains, newest first, uncapped.
+  - the dead phone-notes feature had **four** doors, not one: the tray item, `--show-phone-notes` on the CLI, the `show-phone-notes` remote command, and a Windows Jump List task. All four removed; `phone_home_stems()` stays in storage because the Android side still reports and it is covered by tests.
+  - new durable coverage: `tests/test_tray.py::test_tray_offers_exactly_one_way_to_pick_a_note` asserts the menu is exactly `New Sticky / Notes / Exit`, so a second selector cannot quietly reappear.
+  - `installer\build.ps1` first failed the same environmental way as on `2026-04-27` — a stale `dist\Simple Sticky Notes` locked by an external handle (Dropbox indexing this repo; the running app is the installed copy under `AppData\Local\Programs`, not this one). Moving the stale tree out of `dist` entirely, rather than renaming it inside `dist` (which the script also wipes), let the build succeed on the next run.
 - On `2026-06-02`, `python -m unittest -v` passed `58` tests after reviewing the Obsidian frontmatter feature (auto `title` from the first non-blank line + `stickynote` tag) and fixing three defects plus adding user-frontmatter preservation:
   - external-sync no longer doubles the frontmatter block or rewrites the title to `---` (`app.py` `_current_disk_body` now strips frontmatter like `load_note`);
   - YAML `title` is double-quoted so first lines containing `:` `"` `[` `{` `#` or leading `---` stay valid YAML for Obsidian's properties parser;

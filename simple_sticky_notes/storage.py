@@ -131,7 +131,8 @@ class StickyStorage:
     def phone_home_stems(self) -> list[str]:
         """Filename stems of the notes currently on the Android home screen, as
         written by the phone app to `.simple-sticky-notes/phone-home.json` (synced
-        via Syncthing). Empty if the phone hasn't reported any."""
+        which both ends now reach through Joplin). Empty if the phone hasn't
+        reported any."""
         return read_phone_home_stems(self.phone_home_path())
 
     def find_note_id_for_path(self, path: Path | str) -> str | None:

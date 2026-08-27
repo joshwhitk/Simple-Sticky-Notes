@@ -114,10 +114,12 @@ vault-root note into a sticky if needed. See [`obsidian-plugin/README.md`](obsid
 
 ### Android companion app
 
-`android/` contains a Kotlin home-screen widget app that reads/writes the **same**
-vault markdown files (via Syncthing), using the identical `stickynote`-tag + sidecar
-format. `Frontmatter.kt` is a byte-compatible port of `storage.py`, verified by a
-unit-test suite that mirrors the Python tests. Build and wireless-deploy instructions
+`android/` contains a Kotlin home-screen widget app that reads and writes the **same
+notes as the desktop app**, through the Joplin Data API on the tailnet — one store, so
+there is no sync layer between them to go wrong. `Frontmatter.kt` remains a
+byte-compatible port of `storage.py` for the vault-file backend, which is still
+selectable and still covered by a unit-test suite mirroring the Python tests, but the
+vault itself is a frozen read-only archive since the migration on 2026-08-17. Build and wireless-deploy instructions
 are in [`android/README.md`](android/README.md).
 
 ```powershell

@@ -107,7 +107,6 @@ def build_jumplist(recent: list[tuple[str, str]] | None = None) -> bool:
             shell.IID_IObjectCollection,
         )
         tasks.AddObject(_make_link(exe, args("--new-note"), "New Sticky"))
-        tasks.AddObject(_make_link(exe, args("--show-phone-notes"), "Show phone sticky notes"))
         tasks.AddObject(_make_link(exe, args("--exit"), "Exit"))
         cdl.AddUserTasks(tasks)
 

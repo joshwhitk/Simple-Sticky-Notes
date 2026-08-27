@@ -25,23 +25,37 @@ class TrayTests(unittest.TestCase):
         icon_factory.assert_called_once()
         self.assertIs(icon_factory.call_args.args[1], copied_image)
 
-    def test_recent_submenu_lists_notes_newest_first(self) -> None:
+    def test_notes_submenu_lists_notes(self) -> None:
         app = mock.Mock()
         ctrl = object.__new__(tray.TrayController)
         ctrl.app = app
 
-        app.list_recent_notes_for_menu.return_value = []
-        empty = ctrl._build_recent_submenu()
-        app.list_recent_notes_for_menu.assert_called_with(20)
+        app.list_notes_for_menu.return_value = []
+        empty = ctrl._build_notes_submenu()
         self.assertEqual(len(empty), 1)
         self.assertFalse(empty[0].enabled)
 
         meta = mock.Mock(note_id="abc123", title="My note", is_open=True)
         note = mock.Mock(metadata=meta)
-        app.list_recent_notes_for_menu.return_value = [note]
-        items = ctrl._build_recent_submenu()
+        app.list_notes_for_menu.return_value = [note]
+        items = ctrl._build_notes_submenu()
         self.assertEqual(len(items), 1)
         self.assertEqual(str(items[0].text), "[open] My note")
+
+    def test_tray_offers_exactly_one_way_to_pick_a_note(self) -> None:
+        # It used to offer three: "View Sticky Note" (20 recent), "Notes" (all), and
+        # "Show phone sticky notes" (which stopped working when notes moved to Joplin).
+        ctrl = object.__new__(tray.TrayController)
+        ctrl.app = mock.Mock()
+        labels = [
+            str(item.text)
+            for item in ctrl._build_menu_items()
+            if item is not tray.pystray.Menu.SEPARATOR
+        ]
+
+        self.assertEqual(labels, ["New Sticky", "Notes", "Exit"])
+        self.assertNotIn("View Sticky Note", labels)
+        self.assertNotIn("Show phone sticky notes", labels)
 
     def test_windows_tray_icon_opens_popup_menu_on_left_click(self) -> None:
         icon = object.__new__(tray.StickyNotesTrayIcon)

@@ -3,9 +3,10 @@
 Home-screen sticky-note widgets for Android with two storage backends, matching
 the Windows desktop app:
 
-- **Vault files (default)** — reads/writes the same Obsidian markdown files as
-  the desktop app, via the Syncthing-synced vault folder. No sync code.
-- **Joplin** — reads/writes notes through the Joplin Data API on the tailnet
+- **Vault files** — reads/writes Obsidian markdown files directly. Historical: that
+  vault is a frozen read-only archive since 2026-08-17, so this is kept for reading
+  old exports, not for daily use.
+- **Joplin (default)** — reads/writes notes through the Joplin Data API on the tailnet
   (`http://100.121.209.20:41185`, the phone runs Tailscale), same conventions
   as the desktop app's `simple_sticky_notes/joplin_storage.py`.
 
@@ -97,5 +98,5 @@ Note** widget. (Sideloading by copying the APK into the vault still works as a f
 - No literal typing on the home screen — widgets are tap-to-edit.
 - Apps can't silently place widgets or detect free slots; placement is one system
   confirm each (capped at 40 from the app).
-- Concurrent edits on phone + desktop before sync can create Syncthing
-  `.sync-conflict` files (rare).
+- Concurrent edits on phone + desktop now hit one Joplin note rather than two files,
+  so the old `.sync-conflict` failure mode is gone; last writer wins instead.

@@ -12,7 +12,6 @@ from .windows_integration import install_windows_shortcuts
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Simple Sticky Notes")
     parser.add_argument("--new-note", action="store_true", help="Create and open a new note immediately.")
-    parser.add_argument("--show-phone-notes", action="store_true", help="Open the phone's home-screen sticky notes.")
     parser.add_argument("--show-note", metavar="NOTE_ID", help="Open the note with this id.")
     parser.add_argument("--exit", action="store_true", help="Tell the running app to exit.")
     parser.add_argument(
@@ -28,8 +27,6 @@ def _command_from_args(args: argparse.Namespace) -> dict[str, object] | None:
     """The single Jump-List / CLI action requested, as a remote-command payload."""
     if args.new_note:
         return {"command": "new-note"}
-    if args.show_phone_notes:
-        return {"command": "show-phone-notes"}
     if args.show_note:
         return {"command": "show-note", "note_id": args.show_note}
     if args.exit:

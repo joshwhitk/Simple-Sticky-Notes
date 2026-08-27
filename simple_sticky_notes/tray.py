@@ -86,25 +86,15 @@ class TrayController:
             return image.copy()
 
     def _build_menu_items(self):
+        # One way to reach a note, not three. This menu used to offer "View Sticky Note"
+        # (the 20 most recent), "Notes" (all of them), and "Show phone sticky notes" —
+        # two of which were the same list at different lengths, and the third stopped
+        # working when the notes moved to Joplin. One submenu, newest first.
         return (
             pystray.MenuItem("New Sticky", self._schedule(self.app.new_note)),
-            pystray.MenuItem("View Sticky Note", pystray.Menu(self._build_recent_submenu)),
-            pystray.MenuItem("Show phone sticky notes", self._schedule(self.app.show_phone_notes)),
             pystray.MenuItem("Notes", pystray.Menu(self._build_notes_submenu)),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Exit", self._schedule(self.app.shutdown)),
-        )
-
-    def _build_recent_submenu(self):
-        notes = self.app.list_recent_notes_for_menu(20)
-        if not notes:
-            return (pystray.MenuItem("(No notes yet)", lambda: None, enabled=False),)
-        return tuple(
-            pystray.MenuItem(
-                tray_note_menu_label(note),
-                self._schedule(lambda note_id=note.metadata.note_id: self.app.show_note(note_id)),
-            )
-            for note in notes
         )
 
     def _build_notes_submenu(self):
